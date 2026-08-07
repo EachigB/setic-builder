@@ -1,0 +1,43 @@
+{
+	"id": "7e8f9a0b1c2d",
+	"title": "2 terroristas 1 rehén 30 segundos",
+	"description": "Escenario con 2 terroristas y 1 rehén en imagen fija, puntuación por aciertos, penalización por rehén, tiempo límite de 30 segundos",
+	"files": [
+		{
+			"id": "40566bb01c39",
+			"file_path": "40566bb01c39.jpeg",
+			"timeout_sec": 30,
+			"timeout_action": 4,
+			"video_settings": null,
+			"paths": [
+				{
+					"id": "5bc80ba505d5",
+					"label": "cabeza terrorista",
+					"frame_time_sec": 0,
+					"path": "<path d=\"M154,107 -56,-3\"/>",
+					"action": 1,
+					"next_scene_id": "",
+					"score": 10
+				},
+				{
+					"id": "6cd80ba505d6",
+					"label": "cuerpo terrorista",
+					"frame_time_sec": 0,
+					"path": "<path d=\"M154,107 -56,-3\"/>",
+					"action": 1,
+					"next_scene_id": "",
+					"score": 5
+				},
+				{
+					"id": "7de80ba505d7",
+					"label": "rehén",
+					"frame_time_sec": 0,
+					"path": "<path d=\"M154,107 -56,-3\"/>",
+					"action": 1,
+					"next_scene_id": "",
+					"score": -5
+				}
+			]
+		}
+	]
+}

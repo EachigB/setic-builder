@@ -1,0 +1,133 @@
+{
+    "id": "8f9a0b1c2d3e",
+    "title": "terrorista nivel 1",
+    "description": "(10 videos) Si das de baja a la amenaza, pasas al siguiente video, si no, la amenaza escapa y pierdes.",
+    "files": [
+        {
+            "id": "f001",
+            "file_path": "f001.mp4",
+            "timeout_sec": 55,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p001a", "label": "cabeza amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f002", "score": 10 },
+                { "id": "p001b", "label": "pecho amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f002", "score": 5 },
+                { "id": "p001c", "label": "piernas amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f002", "score": 3 },
+                { "id": "p001d", "label": "cabeza amenaza", "frame_time_sec": 0.5, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f002", "score": 10 },
+                { "id": "p001e", "label": "pecho amenaza", "frame_time_sec": 0.5, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f002", "score": 5 },
+                { "id": "p001f", "label": "piernas amenaza", "frame_time_sec": 0.5, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f002", "score": 3 },
+                { "id": "p001g", "label": "cabeza amenaza", "frame_time_sec": 0.9, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f002", "score": 10 },
+                { "id": "p001h", "label": "pecho amenaza", "frame_time_sec": 0.9, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f002", "score": 5 },
+                { "id": "p001i", "label": "piernas amenaza", "frame_time_sec": 0.9, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f002", "score": 3 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f002",
+            "file_path": "f002.mp4",
+            "timeout_sec": 48,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p002a", "label": "cabeza amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f003", "score": 10 },
+                { "id": "p002b", "label": "pecho amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f003", "score": 5 },
+                { "id": "p002c", "label": "piernas amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f003", "score": 3 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f003",
+            "file_path": "f003.mp4",
+            "timeout_sec": 62,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p003a", "label": "cabeza amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f004", "score": 10 },
+                { "id": "p003b", "label": "pecho amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f004", "score": 5 },
+                { "id": "p003c", "label": "piernas amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f004", "score": 3 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f004",
+            "file_path": "f004.mp4",
+            "timeout_sec": 51,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p004a", "label": "cabeza amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f005", "score": 10 },
+                { "id": "p004b", "label": "pecho amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f005", "score": 5 },
+                { "id": "p004c", "label": "piernas amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f005", "score": 3 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f005",
+            "file_path": "f005.mp4",
+            "timeout_sec": 59,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p005a", "label": "cabeza amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f006", "score": 10 },
+                { "id": "p005b", "label": "pecho amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f006", "score": 5 },
+                { "id": "p005c", "label": "piernas amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f006", "score": 3 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f006",
+            "file_path": "f006.mp4",
+            "timeout_sec": 46,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p006a", "label": "cabeza amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f007", "score": 10 },
+                { "id": "p006b", "label": "pecho amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f007", "score": 5 },
+                { "id": "p006c", "label": "piernas amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f007", "score": 3 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f007",
+            "file_path": "f007.mp4",
+            "timeout_sec": 64,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p007a", "label": "cabeza amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f008", "score": 10 },
+                { "id": "p007b", "label": "pecho amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f008", "score": 5 },
+                { "id": "p007c", "label": "piernas amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f008", "score": 3 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f008",
+            "file_path": "f008.mp4",
+            "timeout_sec": 53,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p008a", "label": "cabeza amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f009", "score": 10 },
+                { "id": "p008b", "label": "pecho amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f009", "score": 5 },
+                { "id": "p008c", "label": "piernas amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f009", "score": 3 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f009",
+            "file_path": "f009.mp4",
+            "timeout_sec": 58,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p009a", "label": "cabeza amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f010", "score": 10 },
+                { "id": "p009b", "label": "pecho amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f010", "score": 5 },
+                { "id": "p009c", "label": "piernas amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f010", "score": 3 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f010",
+            "file_path": "f010.mp4",
+            "timeout_sec": 47,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p010a", "label": "cabeza amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "", "score": 10 },
+                { "id": "p010b", "label": "pecho amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "", "score": 5 },
+                { "id": "p010c", "label": "piernas amenaza", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "", "score": 3 }
+            ],
+            "video_settings": null
+        }
+    ]
+}

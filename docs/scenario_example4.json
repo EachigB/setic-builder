@@ -1,0 +1,235 @@
+{
+    "id": "8f9a0b1c2d3e",
+    "title": "terrorista nivel 1",
+    "description": "(12 videos y 7 imagenes) Si das de baja a la amenaza, pasas al siguiente video, si no, la amenaza escapa y pierdes, si le das al rehen, pierdes también.",
+    "files": [
+        {
+            "id": "f001",
+            "file_path": "f001.mp4",
+            "timeout_sec": 55,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p001a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f002", "score": 10 },
+                { "id": "p001b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f002", "score": 5 },
+                { "id": "p001c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "f002", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f002",
+            "file_path": "f002.mp4",
+            "timeout_sec": 48,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p002a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f003", "score": 10 },
+                { "id": "p002b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f003", "score": 5 },
+                { "id": "p002c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "f003", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f003",
+            "file_path": "f003.mp4",
+            "timeout_sec": 62,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p003a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f004", "score": 10 },
+                { "id": "p003b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f004", "score": 5 },
+                { "id": "p003c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "f004", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f004",
+            "file_path": "f004.mp4",
+            "timeout_sec": 51,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p004a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f005", "score": 10 },
+                { "id": "p004b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f005", "score": 5 },
+                { "id": "p004c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "f005", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f005",
+            "file_path": "f005.mp4",
+            "timeout_sec": 59,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p005a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f006", "score": 10 },
+                { "id": "p005b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f006", "score": 5 },
+                { "id": "p005c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "f006", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f006",
+            "file_path": "f006.mp4",
+            "timeout_sec": 46,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p006a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f007", "score": 10 },
+                { "id": "p006b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f007", "score": 5 },
+                { "id": "p006c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "f007", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f007",
+            "file_path": "f007.mp4",
+            "timeout_sec": 64,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p007a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f008", "score": 10 },
+                { "id": "p007b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f008", "score": 5 },
+                { "id": "p007c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "f008", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f008",
+            "file_path": "f008.mp4",
+            "timeout_sec": 53,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p008a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f009", "score": 10 },
+                { "id": "p008b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f009", "score": 5 },
+                { "id": "p008c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "f009", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f009",
+            "file_path": "f009.mp4",
+            "timeout_sec": 58,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p009a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f010", "score": 10 },
+                { "id": "p009b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f010", "score": 5 },
+                { "id": "p009c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "f010", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f010",
+            "file_path": "f010.mp4",
+            "timeout_sec": 47,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p010a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f011", "score": 10 },
+                { "id": "p010b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f011", "score": 5 },
+                { "id": "p010c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "f011", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f011",
+            "file_path": "f011.mp4",
+            "timeout_sec": 50,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p011a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f012", "score": 10 },
+                { "id": "p011b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "f012", "score": 5 },
+                { "id": "p011c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "f012", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "f012",
+            "file_path": "f012.mp4",
+            "timeout_sec": 52,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "p012a", "label": "cabeza atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i001", "score": 10 },
+                { "id": "p012b", "label": "pecho atacante", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i001", "score": 5 },
+                { "id": "p012c", "label": "rehen", "frame_time_sec": 0.1, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "i001", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "i001",
+            "file_path": "i001.jpg",
+            "timeout_sec": 5,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "pi001a", "label": "cabeza atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i002", "score": 10 },
+                { "id": "pi001b", "label": "pecho atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i002", "score": 5 },
+                { "id": "pi001c", "label": "rehen", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "i002", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "i002",
+            "file_path": "i002.jpg",
+            "timeout_sec": 5,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "pi002a", "label": "cabeza atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i003", "score": 10 },
+                { "id": "pi002b", "label": "pecho atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i003", "score": 5 },
+                { "id": "pi002c", "label": "rehen", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "i003", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "i003",
+            "file_path": "i003.jpg",
+            "timeout_sec": 5,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "pi003a", "label": "cabeza atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i004", "score": 10 },
+                { "id": "pi003b", "label": "pecho atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i004", "score": 5 },
+                { "id": "pi003c", "label": "rehen", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "i004", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "i004",
+            "file_path": "i004.jpg",
+            "timeout_sec": 5,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "pi004a", "label": "cabeza atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i005", "score": 10 },
+                { "id": "pi004b", "label": "pecho atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i005", "score": 5 },
+                { "id": "pi004c", "label": "rehen", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "i005", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "i005",
+            "file_path": "i005.jpg",
+            "timeout_sec": 5,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "pi005a", "label": "cabeza atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i006", "score": 10 },
+                { "id": "pi005b", "label": "pecho atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i006", "score": 5 },
+                { "id": "pi005c", "label": "rehen", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "i006", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "i006",
+            "file_path": "i006.jpg",
+            "timeout_sec": 5,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "pi006a", "label": "cabeza atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i007", "score": 10 },
+                { "id": "pi006b", "label": "pecho atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 1, "next_scene_id": "i007", "score": 5 },
+                { "id": "pi006c", "label": "rehen", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "i007", "score": -10 }
+            ],
+            "video_settings": null
+        },
+        {
+            "id": "i007",
+            "file_path": "i007.jpg",
+            "timeout_sec": 5,
+            "timeout_action": 3,
+            "paths": [
+                { "id": "pi007a", "label": "cabeza atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 4, "next_scene_id": "", "score": 10 },
+                { "id": "pi007b", "label": "pecho atacante", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 4, "next_scene_id": "", "score": 5 },
+                { "id": "pi007c", "label": "rehen", "frame_time_sec": 0, "path": "<path d=\"M154,107 -56,-3\"/>", "action": 2, "next_scene_id": "", "score": -10 }
+            ],
+            "video_settings": null
+        }
+    ]
+}

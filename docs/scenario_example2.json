@@ -1,0 +1,109 @@
+{
+    "id": "8f9a0b1c2d3e",
+    "title": "terrorista nivel 1",
+    "description": "Escenario con un terrorista en video loop realizando varias acciones aleatorias, puntuación por aciertos en cabeza, pecho y piernas, tiempo límite de 60 segundos",
+    "files": [
+        {
+            "id": "40566bb01c39",
+            "file_path": "40566bb01c39.mp4",
+            "timeout_sec": 60,
+            "timeout_action": 4,
+            "paths": [
+                {
+                    "id": "5bc80ba505d5",
+                    "label": "cabeza terrorista",
+                    "frame_time_sec": 0.1,
+                    "path": "<path d=\"M154,107 -56,-3\"/>",
+                    "action": 1,
+                    "next_scene_id": "",
+                    "score": 10
+                },
+                {
+                    "id": "5bc80ba505d51",
+                    "label": "pecho terrorista",
+                    "frame_time_sec": 0.1,
+                    "path": "<path d=\"M154,107 -56,-3\"/>",
+                    "action": 1,
+                    "next_scene_id": "",
+                    "score": 5
+                },
+                {
+                    "id": "6cd80ba505d6",
+                    "label": "piernas terrorista",
+                    "frame_time_sec": 0.1,
+                    "path": "<path d=\"M154,107 -56,-3\"/>",
+                    "action": 1,
+                    "next_scene_id": "",
+                    "score": 3
+                },
+                {
+                    "id": "6cd80ba505d6",
+                    "label": "cabeza terrorista",
+                    "frame_time_sec": 0.5,
+                    "path": "<path d=\"M154,107 -56,-3\"/>",
+                    "action": 1,
+                    "next_scene_id": "",
+                    "score": 10
+                },
+                {
+                    "id": "6cd80ba505d61",
+                    "label": "pecho terrorista",
+                    "frame_time_sec": 0.5,
+                    "path": "<path d=\"M154,107 -56,-3\"/>",
+                    "action": 1,
+                    "next_scene_id": "",
+                    "score": 5
+                },
+                {
+                    "id": "6cd80ba505d62",
+                    "label": "piernas terrorista",
+                    "frame_time_sec": 0.5,
+                    "path": "<path d=\"M154,107 -56,-3\"/>",
+                    "action": 1,
+                    "next_scene_id": "",
+                    "score": 3
+                },
+                {
+                    "id": "7de80ba505d7",
+                    "label": "cabeza terrorista",
+                    "frame_time_sec": 0.9,
+                    "path": "<path d=\"M154,107 -56,-3\"/>",
+                    "action": 1,
+                    "next_scene_id": "",
+                    "score": 10
+                },
+                {
+                    "id": "7de80ba505d71",
+                    "label": "pecho terrorista",
+                    "frame_time_sec": 0.9,
+                    "path": "<path d=\"M154,107 -56,-3\"/>",
+                    "action": 1,
+                    "next_scene_id": "",
+                    "score": 5
+                },
+                {
+                    "id": "7de80ba505d72",
+                    "label": "piernas terrorista",
+                    "frame_time_sec": 0.9,
+                    "path": "<path d=\"M154,107 -56,-3\"/>",
+                    "action": 1,
+                    "next_scene_id": "",
+                    "score": 3
+                }
+            ],
+            "video_settings": {
+                "checkpoints_sec": [
+                    3.1241234,
+                    7.2345333,
+                    9.1234123,
+                    11.234344,
+                    15.234343,
+                    18.234234,
+                    21.234234,
+                    25.234234
+                ],
+                "video_loop": true
+            }
+        }
+    ]
+}
