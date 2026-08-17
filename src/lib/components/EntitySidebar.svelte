@@ -1,13 +1,15 @@
 <script lang="ts">
     import { editor } from '$lib/stores/editor.svelte';
     import { HitAction } from '$lib/values';
-    import { Plus, X, Download, Upload, Trash2 } from '@lucide/svelte';
+    import { Plus, X, Download, Upload, Trash2, CloudUpload } from '@lucide/svelte';
 
-    let { onDeletePath, onDeleteEntity, onExport, onImport }: {
+    let { onDeletePath, onDeleteEntity, onExport, onImport, onPublish, publishing }: {
         onDeletePath: (id: string) => void;
         onDeleteEntity: (entityId: string) => void;
         onExport: () => void;
         onImport: () => void;
+        onPublish: () => void;
+        publishing: boolean;
     } = $props();
 
     let entityListEl: HTMLDivElement | undefined = $state();
@@ -75,6 +77,12 @@
         editor.closeSidebar();
         onExport();
     }
+
+    function handlePublish()
+    {
+        editor.closeSidebar();
+        onPublish();
+    }
 </script>
 
 {#if editor.sidebarOpen}
@@ -112,6 +120,25 @@
                 onclick={handleExport}
             >
                 <Download size={16} /> Exportar
+            </button>
+             <button
+                class="col-span-2 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors
+                       bg-green-600 hover:bg-green-500 text-white border border-transparent
+                       disabled:opacity-40 disabled:cursor-not-allowed"
+                onclick={handlePublish}
+                disabled={publishing}
+            >
+                <CloudUpload size={16} /> {publishing ? 'Publicando...' : 'Publicar en servidor'}
+            </button>
+            <button
+                class="col-span-2 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors
+                       bg-primary-600 hover:bg-primary-500 text-white border border-transparent
+                       disabled:opacity-40 disabled:cursor-not-allowed"
+                onclick={handlePublish}
+                disabled={publishing}
+            >
+                <CloudUpload size={16} />
+                {publishing ? 'Publicando...' : 'Publicar en servidor'}
             </button>
         </div>
 

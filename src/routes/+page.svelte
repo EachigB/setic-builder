@@ -12,6 +12,7 @@
     import type { HitScenario, HitFile, Entity, EntityPath } from '$lib/models';
     import { clearWorkspace, type WorkspaceData } from '$lib/stores/persistence';
     import type { SceneData } from '$lib/stores/editor.svelte';
+    import { saveScenario, uploadMedia } from '$lib/services/apiService';
 
     let canvasRef: Canvas;
     let fileInputEl: HTMLInputElement;
@@ -320,6 +321,73 @@
         URL.revokeObjectURL(url);
     }
 
+    // ── Publicar en el servidor ───────────────────────────────────────────────
+
+    let publishing = $state(false);
+    let publishMsg = $state('');
+
+    async function handlePublish(): Promise<void>
+    {
+        if (editor.scenes.length === 0) return;
+
+        const name = prompt(
+            'Nombre del escenario:',
+            editor.scenes[0]?.mediaName.replace(/\.[^.]+$/, '') || 'escenario'
+        );
+        if (!name) return;
+
+        publishing = true;
+        publishMsg = '';
+
+        try {
+            // 1. Construir el mismo JSON que exporta el botón de descarga
+            const files = editor.scenes.map(scene => {
+                const exportEntities: Entity[] = scene.entities
+                    .map(e => ({ ...e, paths: e.paths.filter(p => !!p.path) }))
+                    .filter(e => e.paths.length > 0);
+                return {
+                    id: scene.id,
+                    file_path: scene.mediaName,
+                    timeout_sec: 0,
+                    timeout_action: HitAction.NONE,
+                    entities: exportEntities,
+                    video_settings: scene.mediaType === 'video' ? { loop: false } : null,
+                };
+            });
+
+            const scenario: HitScenario = {
+                id: generateId(),
+                title: name,
+                description: '',
+                viewbox_w: editor.mediaWidth,
+                viewbox_h: editor.mediaHeight,
+                files,
+            };
+
+            // 2. Crear el escenario en el servidor
+            publishMsg = 'Creando escenario...';
+            const saved = await saveScenario(name, 'full', scenario);
+
+            // 3. Subir los archivos de cada escena
+            let done = 0;
+            const total = editor.scenes.filter(s => s.file).length;
+            for (const scene of editor.scenes) {
+                if (!scene.file) continue;
+                done++;
+                publishMsg = `Subiendo ${scene.mediaName} (${done}/${total})...`;
+                await uploadMedia(saved.id, scene.file);
+            }
+
+            publishMsg = '';
+            alert(`Escenario "${name}" publicado.\n\nYa aparece en la lista de escenarios.`);
+        } catch (e) {
+            publishMsg = '';
+            alert(`No se pudo publicar: ${(e as Error).message}`);
+        } finally {
+            publishing = false;
+        }
+    }
+
     // ── Import ────────────────────────────────────────────────────────────────
 
     function handleImportJson(e: Event): void
@@ -555,6 +623,8 @@
         onDeletePath={handleDeletePath}
         onDeleteEntity={handleDeleteEntity}
         onExport={handleExport}
+        onPublish={handlePublish}
+        {publishing}
         onImport={triggerImportJson}
     />
 {/if}
