@@ -13,6 +13,7 @@
     import { clearWorkspace, type WorkspaceData } from '$lib/stores/persistence';
     import type { SceneData } from '$lib/stores/editor.svelte';
     import { saveScenario, uploadMedia } from '$lib/services/apiService';
+    import { session, login } from '$lib/services/authService';
 
     let canvasRef: Canvas;
     let fileInputEl: HTMLInputElement;
@@ -329,6 +330,20 @@
     async function handlePublish(): Promise<void>
     {
         if (editor.scenes.length === 0) return;
+
+        // Sin sesión, pedir credenciales antes de publicar
+        if (!$session) {
+            const user = prompt('Usuario:');
+            if (!user) return;
+            const pass = prompt('Contraseña:');
+            if (!pass) return;
+            try {
+                await login(user, pass);
+            } catch {
+                alert('Usuario o contraseña incorrectos.');
+                return;
+            }
+        }
 
         const name = prompt(
             'Nombre del escenario:',
