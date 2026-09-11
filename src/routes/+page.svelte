@@ -331,6 +331,15 @@
     {
         if (editor.scenes.length === 0) return;
 
+        const totalEntities = editor.entities.length
+            + editor.scenes.filter(s => s.id !== editor.activeSceneId)
+                .reduce((a, s) => a + s.entities.length, 0);
+
+        if (totalEntities === 0) {
+            alert('No hay objetivos trazados. Dibuja al menos uno antes de publicar.');
+            return;
+        }
+
         // Sin sesión, pedir credenciales antes de publicar
         if (!$session) {
             const user = prompt('Usuario:');
@@ -355,11 +364,17 @@
         publishMsg = '';
 
         try {
-            // 1. Construir el mismo JSON que exporta el botón de descarga
+            // La escena activa tiene sus entidades en editor.entities; las demás,
+            // en su propia copia. Hay que tomar de cada sitio lo que corresponde.
             const files = editor.scenes.map(scene => {
-                const exportEntities: Entity[] = scene.entities
+                const source = scene.id === editor.activeSceneId
+                    ? editor.entities
+                    : scene.entities;
+
+                const exportEntities: Entity[] = source
                     .map(e => ({ ...e, paths: e.paths.filter(p => !!p.path) }))
                     .filter(e => e.paths.length > 0);
+
                 return {
                     id: scene.id,
                     file_path: scene.mediaName,
