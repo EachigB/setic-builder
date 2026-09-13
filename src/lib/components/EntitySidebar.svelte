@@ -130,16 +130,7 @@
             >
                 <CloudUpload size={16} /> {publishing ? 'Publicando...' : 'Publicar en servidor'}
             </button>
-            <button
-                class="col-span-2 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors
-                       bg-primary-600 hover:bg-primary-500 text-white border border-transparent
-                       disabled:opacity-40 disabled:cursor-not-allowed"
-                onclick={handlePublish}
-                disabled={publishing}
-            >
-                <CloudUpload size={16} />
-                {publishing ? 'Publicando...' : 'Publicar en servidor'}
-            </button>
+            
         </div>
 
         <!-- Entities header -->
