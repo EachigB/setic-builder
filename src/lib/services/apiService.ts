@@ -9,11 +9,11 @@ function checkAuth(res: Response) {
 	}
 }
 
-export async function saveScenario(name: string, type: string, data: unknown) {
+export async function saveScenario(name: string, type: string, data: unknown, description?: string) {
 	const res = await fetch(`${API_URL}/scenarios`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json', ...authHeaders() },
-		body: JSON.stringify({ name, type, data })
+		body: JSON.stringify({ name, type, data, description })
 	});
 	checkAuth(res);
 	if (!res.ok) throw new Error(`Error al guardar: ${res.status}`);

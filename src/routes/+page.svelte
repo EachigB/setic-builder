@@ -327,38 +327,42 @@
     let publishing = $state(false);
     let publishMsg = $state('');
 
-    async function handlePublish(): Promise<void>
-    {
-        if (editor.scenes.length === 0) return;
+        // ── Publicar: cuadro propio de SETIC con nombre y descripción ──
+    let publishDlg = $state(false);
+    let pubName = $state('');
+    let pubDesc = $state('');
+    let pubError = $state('');
+    let pubBlocked = $state(false);
 
-        const totalEntities = editor.entities.length
+    function countTargets(): number {
+        return editor.entities.length
             + editor.scenes.filter(s => s.id !== editor.activeSceneId)
                 .reduce((a, s) => a + s.entities.length, 0);
+    }
 
-        if (totalEntities === 0) {
-            alert('No hay objetivos trazados. Dibuja al menos uno antes de publicar.');
+    function handlePublish(): void {
+        if (editor.scenes.length === 0) return;
+        pubName = editor.scenes[0]?.mediaName.replace(/\.[^.]+$/, '') || 'escenario';
+        pubDesc = '';
+        pubBlocked = countTargets() === 0;
+        pubError = pubBlocked
+            ? 'No hay objetivos trazados. Dibuja al menos uno antes de publicar.'
+            : '';
+        publishDlg = true;
+    }
+
+    function confirmPublish(): void {
+        const name = pubName.trim();
+        if (!name) {
+            pubError = 'Ponle un nombre al escenario.';
             return;
         }
+        publishDlg = false;
+        doPublish(name, pubDesc.trim());
+    }
 
-        // Sin sesión, pedir credenciales antes de publicar
-        if (!$session) {
-            const user = prompt('Usuario:');
-            if (!user) return;
-            const pass = prompt('Contraseña:');
-            if (!pass) return;
-            try {
-                await login(user, pass);
-            } catch {
-                alert('Usuario o contraseña incorrectos.');
-                return;
-            }
-        }
-
-        const name = prompt(
-            'Nombre del escenario:',
-            editor.scenes[0]?.mediaName.replace(/\.[^.]+$/, '') || 'escenario'
-        );
-        if (!name) return;
+    async function doPublish(name: string, description: string): Promise<void>
+    {
 
         publishing = true;
         publishMsg = '';
@@ -396,7 +400,7 @@
 
             // 2. Crear el escenario en el servidor
             publishMsg = 'Creando escenario...';
-            const saved = await saveScenario(name, 'full', scenario);
+            const saved = await saveScenario(name, 'full', scenario, description);
 
             // 3. Subir los archivos de cada escena
             let done = 0;
@@ -694,6 +698,58 @@
                     onclick={handleRestoreAccept}
                 >
                     Restaurar
+                </button>
+            </div>
+        </div>
+    </div>
+{/if}
+
+<!-- Publicar: nombre + descripción -->
+{#if publishDlg}
+    <div class="fixed inset-0 z-[400] flex items-center justify-center bg-black/70">
+        <div class="bg-surface-800 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl border border-surface-600">
+            <h3 class="text-lg font-semibold text-surface-100 mb-4">Publicar escenario</h3>
+
+            <label class="block text-xs font-semibold text-surface-400 uppercase tracking-wide mb-1" for="pub-name">
+                Nombre
+            </label>
+            <input
+                id="pub-name"
+                bind:value={pubName}
+                maxlength="80"
+                class="w-full px-3 py-2 mb-4 rounded-lg bg-surface-900 border border-surface-600 text-surface-100 text-sm"
+            />
+
+            <label class="block text-xs font-semibold text-surface-400 uppercase tracking-wide mb-1" for="pub-desc">
+                Descripción del ejercicio
+            </label>
+            <textarea
+                id="pub-desc"
+                bind:value={pubDesc}
+                rows="4"
+                maxlength="500"
+                placeholder="Ej.: Toma de rehenes en local comercial. El tirador debe neutralizar al secuestrador sin herir a la rehén."
+                class="w-full px-3 py-2 rounded-lg bg-surface-900 border border-surface-600 text-surface-100 text-sm resize-none"
+            ></textarea>
+            <p class="text-xs text-surface-500 text-right mt-1">{pubDesc.length}/500</p>
+
+            {#if pubError}
+                <p class="text-sm text-red-400 mt-2">{pubError}</p>
+            {/if}
+
+            <div class="flex gap-3 justify-end mt-5">
+                <button
+                    class="px-4 py-2 rounded-lg text-sm bg-surface-700 hover:bg-surface-600 text-surface-300 transition-colors"
+                    onclick={() => (publishDlg = false)}
+                >
+                    Cancelar
+                </button>
+                <button
+                    class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50"
+                    onclick={confirmPublish}
+                    disabled={pubBlocked}
+                >
+                    Publicar
                 </button>
             </div>
         </div>
