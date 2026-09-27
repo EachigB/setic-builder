@@ -6,7 +6,7 @@ const TOKEN_KEY = 'setic-token';
 const USER_KEY = 'setic-user';
 
 /** Roles que pueden usar el Builder (publicar al catálogo). */
-const BUILDER_ROLES = ['admin', 'superadmin'];
+const BUILDER_ROLES = ['superadmin'];
 
 export interface SessionUser {
 	id: string;
@@ -48,7 +48,7 @@ export async function login(username: string, password: string) {
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ username, password })
 	});
-	if (!res.ok) throw new Error('Usuario o contraseña incorrectos');
+	if (!res.ok) throw new Error('Usuario o contraseña incorrectos, solo superadmin puede ingresar');
 
 	const data = await res.json();
 	if (!canUseBuilder(data.user)) {
