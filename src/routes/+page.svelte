@@ -717,6 +717,7 @@
                 id="pub-name"
                 bind:value={pubName}
                 maxlength="80"
+                onkeydown={(e) => e.stopPropagation()}
                 class="w-full px-3 py-2 mb-4 rounded-lg bg-surface-900 border border-surface-600 text-surface-100 text-sm"
             />
 
@@ -728,6 +729,7 @@
                 bind:value={pubDesc}
                 rows="4"
                 maxlength="500"
+                onkeydown={(e) => e.stopPropagation()}
                 placeholder="Ej.: Toma de rehenes en local comercial. El tirador debe neutralizar al secuestrador sin herir a la rehén."
                 class="w-full px-3 py-2 rounded-lg bg-surface-900 border border-surface-600 text-surface-100 text-sm resize-none"
             ></textarea>
