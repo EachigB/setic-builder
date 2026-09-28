@@ -333,6 +333,7 @@
     let pubDesc = $state('');
     let pubError = $state('');
     let pubBlocked = $state(false);
+    let pubStage = $state<'form' | 'working' | 'done' | 'error'>('form');
 
     function countTargets(): number {
         return editor.entities.length
@@ -348,6 +349,7 @@
         pubError = pubBlocked
             ? 'No hay objetivos trazados. Dibuja al menos uno antes de publicar.'
             : '';
+        pubStage = 'form';
         publishDlg = true;
     }
 
@@ -357,7 +359,7 @@
             pubError = 'Ponle un nombre al escenario.';
             return;
         }
-        publishDlg = false;
+        pubStage = 'working';
         doPublish(name, pubDesc.trim());
     }
 
@@ -392,7 +394,7 @@
             const scenario: HitScenario = {
                 id: generateId(),
                 title: name,
-                description: '',
+                description,
                 viewbox_w: editor.mediaWidth,
                 viewbox_h: editor.mediaHeight,
                 files,
@@ -413,10 +415,11 @@
             }
 
             publishMsg = '';
-            alert(`Escenario "${name}" publicado.\n\nYa aparece en la lista de escenarios.`);
+            pubStage = 'done';
         } catch (e) {
             publishMsg = '';
-            alert(`No se pudo publicar: ${(e as Error).message}`);
+            pubError = (e as Error).message;
+            pubStage = 'error';
         } finally {
             publishing = false;
         }
@@ -704,56 +707,106 @@
     </div>
 {/if}
 
-<!-- Publicar: nombre + descripción -->
+<!-- Publicar: formulario, progreso y resultado -->
 {#if publishDlg}
     <div class="fixed inset-0 z-[400] flex items-center justify-center bg-black/70">
         <div class="bg-surface-800 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl border border-surface-600">
-            <h3 class="text-lg font-semibold text-surface-100 mb-4">Publicar escenario</h3>
+            {#if pubStage === 'form'}
+                <h3 class="text-lg font-semibold text-surface-100 mb-4">Publicar escenario</h3>
 
-            <label class="block text-xs font-semibold text-surface-400 uppercase tracking-wide mb-1" for="pub-name">
-                Nombre
-            </label>
-            <input
-                id="pub-name"
-                bind:value={pubName}
-                maxlength="80"
-                onkeydown={(e) => e.stopPropagation()}
-                class="w-full px-3 py-2 mb-4 rounded-lg bg-surface-900 border border-surface-600 text-surface-100 text-sm"
-            />
+                <label class="block text-xs font-semibold text-surface-400 uppercase tracking-wide mb-1" for="pub-name">
+                    Nombre
+                </label>
+                <input
+                    id="pub-name"
+                    bind:value={pubName}
+                    maxlength="80"
+                    onkeydown={(e) => e.stopPropagation()}
+                    class="w-full px-3 py-2 mb-4 rounded-lg bg-surface-900 border border-surface-600 text-surface-100 text-sm"
+                />
 
-            <label class="block text-xs font-semibold text-surface-400 uppercase tracking-wide mb-1" for="pub-desc">
-                Descripción del ejercicio
-            </label>
-            <textarea
-                id="pub-desc"
-                bind:value={pubDesc}
-                rows="4"
-                maxlength="500"
-                onkeydown={(e) => e.stopPropagation()}
-                placeholder="Ej.: Toma de rehenes en local comercial. El tirador debe neutralizar al secuestrador sin herir a la rehén."
-                class="w-full px-3 py-2 rounded-lg bg-surface-900 border border-surface-600 text-surface-100 text-sm resize-none"
-            ></textarea>
-            <p class="text-xs text-surface-500 text-right mt-1">{pubDesc.length}/500</p>
+                <label class="block text-xs font-semibold text-surface-400 uppercase tracking-wide mb-1" for="pub-desc">
+                    Descripción del ejercicio
+                </label>
+                <textarea
+                    id="pub-desc"
+                    bind:value={pubDesc}
+                    rows="4"
+                    maxlength="500"
+                    onkeydown={(e) => e.stopPropagation()}
+                    placeholder="Ej.: Toma de rehenes en local comercial. El tirador debe neutralizar al secuestrador sin herir a la rehén."
+                    class="w-full px-3 py-2 rounded-lg bg-surface-900 border border-surface-600 text-surface-100 text-sm resize-none"
+                ></textarea>
+                <p class="text-xs text-surface-500 text-right mt-1">{pubDesc.length}/500</p>
 
-            {#if pubError}
-                <p class="text-sm text-red-400 mt-2">{pubError}</p>
+                {#if pubError}
+                    <p class="text-sm text-red-400 mt-2">{pubError}</p>
+                {/if}
+
+                <div class="flex gap-3 justify-end mt-5">
+                    <button
+                        class="px-4 py-2 rounded-lg text-sm bg-surface-700 hover:bg-surface-600 text-surface-300 transition-colors"
+                        onclick={() => (publishDlg = false)}
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50"
+                        onclick={confirmPublish}
+                        disabled={pubBlocked}
+                    >
+                        Publicar
+                    </button>
+                </div>
+            {:else if pubStage === 'working'}
+                <h3 class="text-lg font-semibold text-surface-100 mb-4">Publicando…</h3>
+                <p class="text-sm text-surface-300">{publishMsg || 'Preparando…'}</p>
+                <div class="mt-4 h-1.5 rounded-full bg-surface-700 overflow-hidden">
+                    <div class="h-full w-1/3 bg-green-500 rounded-full pub-bar"></div>
+                </div>
+                <p class="text-xs text-surface-500 mt-4">No cierres esta ventana hasta que termine.</p>
+            {:else if pubStage === 'done'}
+                <h3 class="text-lg font-semibold text-green-400 mb-3">Escenario publicado</h3>
+                <p class="text-sm text-surface-300">
+                    <span class="font-semibold text-surface-100">{pubName}</span>
+                    ya aparece en la lista de escenarios de todos los polígonos.
+                </p>
+                <div class="flex justify-end mt-5">
+                    <button
+                        class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-500 text-white transition-colors"
+                        onclick={() => (publishDlg = false)}
+                    >
+                        Listo
+                    </button>
+                </div>
+            {:else if pubStage === 'error'}
+                <h3 class="text-lg font-semibold text-red-400 mb-3">No se pudo publicar</h3>
+                <p class="text-sm text-surface-300">{pubError}</p>
+                <div class="flex gap-3 justify-end mt-5">
+                    <button
+                        class="px-4 py-2 rounded-lg text-sm bg-surface-700 hover:bg-surface-600 text-surface-300 transition-colors"
+                        onclick={() => (publishDlg = false)}
+                    >
+                        Cerrar
+                    </button>
+                    <button
+                        class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-500 text-white transition-colors"
+                        onclick={() => { pubError = ''; pubStage = 'form'; }}
+                    >
+                        Volver
+                    </button>
+                </div>
             {/if}
-
-            <div class="flex gap-3 justify-end mt-5">
-                <button
-                    class="px-4 py-2 rounded-lg text-sm bg-surface-700 hover:bg-surface-600 text-surface-300 transition-colors"
-                    onclick={() => (publishDlg = false)}
-                >
-                    Cancelar
-                </button>
-                <button
-                    class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50"
-                    onclick={confirmPublish}
-                    disabled={pubBlocked}
-                >
-                    Publicar
-                </button>
-            </div>
         </div>
     </div>
 {/if}
+
+<style>
+    .pub-bar {
+        animation: pubSlide 1.2s ease-in-out infinite;
+    }
+    @keyframes pubSlide {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(300%); }
+    }
+</style>
