@@ -155,6 +155,26 @@
 
     export function playVideo(): void  { videoEl?.play(); }
     export function pauseVideo(): void { videoEl?.pause(); }
+        /**
+     * Foto del cuadro que se ve ahora en el editor, en JPEG liviano.
+     * Se usa como portada del escenario en el carrusel de SETIC Virt.
+     */
+    export function captureFrame(maxWidth = 640): Promise<Blob | null> {
+        const src = isVideoMode ? videoEl : canvasEl;
+        if (!src) return Promise.resolve(null);
+
+        const w = isVideoMode ? videoEl.videoWidth : canvasEl.width;
+        const h = isVideoMode ? videoEl.videoHeight : canvasEl.height;
+        if (!w || !h) return Promise.resolve(null);
+
+        const scale = Math.min(1, maxWidth / w);
+        const out = document.createElement('canvas');
+        out.width = Math.round(w * scale);
+        out.height = Math.round(h * scale);
+        out.getContext('2d')!.drawImage(src, 0, 0, out.width, out.height);
+
+        return new Promise(resolve => out.toBlob(b => resolve(b), 'image/jpeg', 0.8));
+    }
 
     /**
      * Add a Paper.js visual for an EntityPath created externally

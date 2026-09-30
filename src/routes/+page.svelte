@@ -334,6 +334,8 @@
     let pubError = $state('');
     let pubBlocked = $state(false);
     let pubStage = $state<'form' | 'working' | 'done' | 'error'>('form');
+    let pubCover = $state<Blob | null>(null);
+    let pubCoverUrl = $state('');
 
     function countTargets(): number {
         return editor.entities.length
@@ -341,8 +343,15 @@
                 .reduce((a, s) => a + s.entities.length, 0);
     }
 
-    function handlePublish(): void {
+    async function handlePublish(): Promise<void> {
         if (editor.scenes.length === 0) return;
+
+        // Congelar el cuadro actual y tomarlo como portada
+        canvasRef?.pauseVideo();
+        pubCover = (await canvasRef?.captureFrame()) ?? null;
+        if (pubCoverUrl) URL.revokeObjectURL(pubCoverUrl);
+        pubCoverUrl = pubCover ? URL.createObjectURL(pubCover) : '';
+
         pubName = editor.scenes[0]?.mediaName.replace(/\.[^.]+$/, '') || 'escenario';
         pubDesc = '';
         pubBlocked = countTargets() === 0;
@@ -412,6 +421,12 @@
                 done++;
                 publishMsg = `Subiendo ${scene.mediaName} (${done}/${total})...`;
                 await uploadMedia(saved.id, scene.file);
+            }
+
+            // 4. Portada
+            if (pubCover) {
+                publishMsg = 'Subiendo portada...';
+                await uploadMedia(saved.id, new File([pubCover], '__portada.jpg', { type: 'image/jpeg' }));
             }
 
             publishMsg = '';
@@ -713,6 +728,13 @@
         <div class="bg-surface-800 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl border border-surface-600">
             {#if pubStage === 'form'}
                 <h3 class="text-lg font-semibold text-surface-100 mb-4">Publicar escenario</h3>
+
+                {#if pubCoverUrl}
+                    <img src={pubCoverUrl} alt="Portada" class="w-full rounded-lg border border-surface-600 mb-1" />
+                    <p class="text-xs text-surface-500 mb-4">
+                        Portada: el cuadro que tienes en pantalla. Para cambiarla, cancela, busca otro momento del video y vuelve a publicar.
+                    </p>
+                {/if}
 
                 <label class="block text-xs font-semibold text-surface-400 uppercase tracking-wide mb-1" for="pub-name">
                     Nombre
