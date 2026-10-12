@@ -8,11 +8,11 @@
     import { HitAction } from '$lib/values';
     import { generateId } from '$lib/utils';
     import { interpolatePaths, wrapPathData } from '$lib/interpolation';
-    import { Film, Image } from '@lucide/svelte';
+    import { Film, Image, CloudDownload } from '@lucide/svelte';
     import type { HitScenario, HitFile, Entity, EntityPath } from '$lib/models';
     import { clearWorkspace, type WorkspaceData } from '$lib/stores/persistence';
     import type { SceneData } from '$lib/stores/editor.svelte';
-    import { saveScenario, uploadMedia } from '$lib/services/apiService';
+    import { saveScenario, uploadMedia, listScenarios, getScenario, downloadMedia, type PublishedScenario } from '$lib/services/apiService';
     import { session, login } from '$lib/services/authService';
 
     let canvasRef: Canvas;
@@ -99,8 +99,11 @@
             canvasRef.seekTo(scene.currentTimeMs);
     }
 
-    /** Called when user adds the very first file or a new scene via SceneBar */
-    function handleAddScene(file: File): void
+    /**
+     * Called when user adds the very first file or a new scene via SceneBar.
+     * `done` avisa cuando la escena ya terminó de cargar (para abrir varias seguidas).
+     */
+    function handleAddScene(file: File, done?: () => void): void
     {
         // Flush and clear current scene if one exists
         if (editor.scenes.length > 0)
@@ -110,20 +113,24 @@
         }
 
         const isFirst = editor.scenes.length === 0;
+        editor.liveSceneId = null;
         const scene = editor.addScene(file);
 
         // Si este archivo ya se había dibujado (por nombre), vuelven sus entidades.
         // Si no, en la primera escena se intenta el guardado viejo de una sola escena.
-        let onReady: (() => void) | undefined;
-        if (scene.entities.length > 0)
-            onReady = () =>
+        const onReady = () =>
+        {
+            editor.liveSceneId = scene.id;
+            if (scene.entities.length > 0)
             {
                 restoreSceneVisuals(scene);
                 editor.saveNow();
-                editor.showToast(`${scene.mediaName}: se recuperaron ${scene.entities.length} entidades`);
-            };
-        else if (isFirst)
-            onReady = () => tryRestore();
+                if (!done) editor.showToast(`${scene.mediaName}: se recuperaron ${scene.entities.length} entidades`);
+            }
+            else if (isFirst && !done)
+                tryRestore();
+            done?.();
+        };
         loadSceneIntoCanvas(file, scene.id, onReady);
     }
 
@@ -137,6 +144,7 @@
 
         // Clear canvas visuals
         canvasRef.clearAllVisuals();
+        editor.liveSceneId = null;
 
         // Get target scene data before the canvas resets editor.entities via resetMedia
         const targetScene = editor.scenes.find(s => s.id === id)!;
@@ -152,7 +160,11 @@
         // Load canvas — resetMedia (inside loadVideo/loadImage) will clear entities,
         // then onReady restores them from the scene snapshot
         if (targetScene.file)
-            loadSceneIntoCanvas(targetScene.file, id, () => restoreSceneVisuals(targetScene));
+            loadSceneIntoCanvas(targetScene.file, id, () =>
+            {
+                restoreSceneVisuals(targetScene);
+                editor.liveSceneId = id;
+            });
     }
 
     /** Remove a scene; if it was active, switch to the first remaining one */
@@ -180,8 +192,13 @@
                 editor.selectedEntityId = null;
                 editor.selectedPathIndex = -1;
 
+                editor.liveSceneId = null;
                 if (nextScene.file)
-                    loadSceneIntoCanvas(nextScene.file, nextId, () => restoreSceneVisuals(nextScene));
+                    loadSceneIntoCanvas(nextScene.file, nextId, () =>
+                    {
+                        restoreSceneVisuals(nextScene);
+                        editor.liveSceneId = nextId;
+                    });
             }
             else
             {
@@ -450,6 +467,110 @@
         }
     }
 
+    // ── Abrir un escenario ya publicado ──────────────────────────────────────
+
+    let openDlg = $state<{
+        show: boolean;
+        loading: boolean;
+        error: string;
+        list: PublishedScenario[];
+        progress: string;
+    }>({ show: false, loading: false, error: '', list: [], progress: '' });
+
+    async function handleOpenPublished(): Promise<void>
+    {
+        openDlg = { show: true, loading: true, error: '', list: [], progress: '' };
+        try
+        {
+            const all = await listScenarios();
+            // Solo los del Builder (los 3D se editan en SETIC Virt)
+            openDlg.list = all.filter(s => !s.type || s.type === 'full');
+        }
+        catch (e)
+        {
+            openDlg.error = (e as Error).message;
+        }
+        openDlg.loading = false;
+    }
+
+    function closeOpenDlg(): void
+    {
+        if (openDlg.progress) return;   // no cerrar a mitad de la descarga
+        openDlg = { show: false, loading: false, error: '', list: [], progress: '' };
+    }
+
+    /** Agrega una escena y espera a que termine de cargar (máx. 20 s). */
+    function addSceneAndWait(file: File): Promise<void>
+    {
+        return new Promise(resolve =>
+        {
+            const t = setTimeout(resolve, 20000);
+            handleAddScene(file, () => { clearTimeout(t); resolve(); });
+        });
+    }
+
+    function guessType(name: string, blobType: string): string
+    {
+        if (blobType && blobType !== 'application/octet-stream') return blobType;
+        const ext = name.split('.').pop()?.toLowerCase() ?? '';
+        if (['mp4', 'webm', 'mov', 'mkv'].includes(ext)) return `video/${ext === 'mov' ? 'quicktime' : ext}`;
+        return `image/${ext === 'jpg' ? 'jpeg' : ext || 'png'}`;
+    }
+
+    /**
+     * Baja el escenario del servidor (json + imágenes/videos) y lo abre con
+     * todas sus escenas y entidades, listo para seguir editando.
+     */
+    async function openPublished(s: PublishedScenario): Promise<void>
+    {
+        openDlg.error = '';
+        try
+        {
+            openDlg.progress = 'Leyendo escenario…';
+            const full = await getScenario(s.id);
+            const files: HitFile[] = full.data?.files ?? [];
+            if (files.length === 0) throw new Error('Ese escenario no tiene escenas.');
+
+            // Bajar todos los archivos antes de tocar lo que está abierto
+            const media: File[] = [];
+            for (let i = 0; i < files.length; i++)
+            {
+                openDlg.progress = `Descargando ${i + 1} de ${files.length}: ${files[i].file_path}`;
+                const blob = await downloadMedia(s.id, files[i].file_path);
+                media.push(new File([blob], files[i].file_path, { type: guessType(files[i].file_path, blob.type) }));
+            }
+
+            // Cerrar lo abierto (queda guardado en el navegador por nombre de archivo)
+            editor.flushToActiveScene();
+            editor.saveNow();
+            canvasRef.clearAllVisuals();
+            editor.scenes = [];
+            editor.activeSceneId = null;
+            editor.liveSceneId = null;
+
+            // Guardar las entidades de todas las escenas, con sus ids (para las flechas)
+            editor.importScenarioFiles(files);
+
+            for (let i = 0; i < media.length; i++)
+            {
+                openDlg.progress = `Abriendo escena ${i + 1} de ${media.length}…`;
+                await addSceneAndWait(media[i]);
+            }
+
+            // Volver a la primera escena (se guarda sola al terminar de cargar)
+            editor.saveNow();
+            if (editor.scenes[0]) handleSwitchScene(editor.scenes[0].id);
+
+            openDlg = { show: false, loading: false, error: '', list: [], progress: '' };
+            editor.showToast(`Abierto "${s.name}" con ${media.length} escenas. Al publicar se crea uno nuevo.`, 'info', 5000);
+        }
+        catch (e)
+        {
+            openDlg.progress = '';
+            openDlg.error = (e as Error).message;
+        }
+    }
+
     // ── Import ────────────────────────────────────────────────────────────────
 
     function handleImportJson(e: Event): void
@@ -667,6 +788,13 @@
                 <p class="text-xs text-surface-600 mt-3">Imágenes: PNG, JPG, WebP · Videos: MP4, WebM, MOV</p>
             </div>
         </button>
+        <button
+            class="mt-6 flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm bg-surface-800 hover:bg-surface-700
+                   text-surface-200 border border-surface-600 transition-colors"
+            onclick={handleOpenPublished}
+        >
+            <CloudDownload size={16} /> Abrir escenario publicado
+        </button>
         <input
             bind:this={fileInputEl}
             type="file"
@@ -695,6 +823,7 @@
         onPublish={handlePublish}
         {publishing}
         onImport={triggerImportJson}
+        onOpenPublished={handleOpenPublished}
     />
 {/if}
 
@@ -712,6 +841,50 @@
 {/if}
 
 <!-- Restore dialog -->
+{#if openDlg.show}
+    <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+        <div class="bg-surface-800 rounded-xl p-6 w-full max-w-lg mx-4 shadow-2xl border border-surface-600">
+            <h3 class="text-lg font-semibold text-surface-100 mb-1">Abrir escenario publicado</h3>
+            <p class="text-sm text-surface-400 mb-4">Se abre con todas sus escenas y entidades para seguir editándolo.</p>
+
+            {#if openDlg.progress}
+                <p class="text-sm text-surface-200 py-6 text-center">{openDlg.progress}</p>
+            {:else if openDlg.loading}
+                <p class="text-sm text-surface-400 py-6 text-center">Cargando lista…</p>
+            {:else}
+                <div class="max-h-80 overflow-y-auto space-y-1 mb-4">
+                    {#each openDlg.list as s (s.id)}
+                        <button
+                            class="w-full text-left px-3 py-2 rounded-lg bg-surface-900 hover:bg-surface-700 border border-surface-700 transition-colors"
+                            onclick={() => openPublished(s)}
+                        >
+                            <span class="block text-sm text-surface-100">{s.name}</span>
+                            {#if s.description}
+                                <span class="block text-xs text-surface-500 truncate">{s.description}</span>
+                            {/if}
+                        </button>
+                    {:else}
+                        <p class="text-sm text-surface-500 py-4 text-center">No hay escenarios publicados.</p>
+                    {/each}
+                </div>
+            {/if}
+
+            {#if openDlg.error}
+                <p class="text-sm text-red-400 mb-3">{openDlg.error}</p>
+            {/if}
+
+            {#if !openDlg.progress}
+                <div class="flex justify-end">
+                    <button
+                        class="px-4 py-2 rounded-lg text-sm bg-surface-700 hover:bg-surface-600 text-surface-300 transition-colors"
+                        onclick={closeOpenDlg}
+                    >Cerrar</button>
+                </div>
+            {/if}
+        </div>
+    </div>
+{/if}
+
 {#if restoreDialog.show}
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
         <div class="bg-surface-800 rounded-xl p-6 max-w-md mx-4 shadow-2xl border border-surface-600">

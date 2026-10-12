@@ -33,3 +33,36 @@ export async function uploadMedia(scenarioId: string, file: File) {
 	if (!res.ok) throw new Error(`Error al subir ${file.name}: ${res.status}`);
 	return res.json();
 }
+export interface PublishedScenario {
+	id: string;
+	name: string;
+	type?: string;
+	description?: string | null;
+	createdAt?: string;
+}
+
+/** Escenarios publicados (los que ve el superadmin). */
+export async function listScenarios(): Promise<PublishedScenario[]> {
+	const res = await fetch(`${API_URL}/scenarios`, { headers: authHeaders() });
+	checkAuth(res);
+	if (!res.ok) throw new Error(`No se pudo leer la lista: ${res.status}`);
+	return res.json();
+}
+
+/** Un escenario publicado con su JSON completo (en `data`). */
+export async function getScenario(id: string): Promise<PublishedScenario & { data: any }> {
+	const res = await fetch(`${API_URL}/scenarios/${id}`, { headers: authHeaders() });
+	checkAuth(res);
+	if (!res.ok) throw new Error(`No se pudo abrir el escenario: ${res.status}`);
+	return res.json();
+}
+
+/** Descarga una imagen o video de un escenario publicado. */
+export async function downloadMedia(id: string, fileName: string): Promise<Blob> {
+	const res = await fetch(`${API_URL}/scenarios/${id}/media/${encodeURIComponent(fileName)}`, {
+		headers: authHeaders()
+	});
+	checkAuth(res);
+	if (!res.ok) throw new Error(`No se pudo descargar ${fileName}: ${res.status}`);
+	return res.blob();
+}

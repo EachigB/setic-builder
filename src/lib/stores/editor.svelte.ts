@@ -69,6 +69,13 @@ class EditorState
      */
     private library: Record<string, SavedScene> | null = null;
 
+    /**
+     * Escena que ya terminó de cargar en el lienzo. Mientras una escena carga,
+     * `entities` todavía tiene lo de la anterior (o nada): en ese rato no se
+     * guarda nada de ella, para no pisarla con datos que no son suyos.
+     */
+    liveSceneId: string | null = null;
+
     private getLibrary(): Record<string, SavedScene>
     {
         if (!this.library)
@@ -92,7 +99,7 @@ class EditorState
         const lib = this.getLibrary();
         for (const s of this.scenes)
         {
-            const live = s.id === this.activeSceneId;
+            const live = s.id === this.activeSceneId && s.id === this.liveSceneId;
             lib[s.mediaName] = {
                 id: s.id,
                 mediaName: s.mediaName,
@@ -155,6 +162,8 @@ class EditorState
             this.entities = remap(this.entities);
             if (this.activeSceneId && idMap[this.activeSceneId])
                 this.activeSceneId = idMap[this.activeSceneId];
+            if (this.liveSceneId && idMap[this.liveSceneId])
+                this.liveSceneId = idMap[this.liveSceneId];
         }
 
         // Escenas abiertas que no son la activa: se llenan con lo importado
@@ -185,7 +194,7 @@ class EditorState
     /** Save current entity state into the active scene snapshot */
     flushToActiveScene(): void
     {
-        if (!this.activeSceneId) return;
+        if (!this.activeSceneId || this.activeSceneId !== this.liveSceneId) return;
         this.scenes = this.scenes.map(s =>
             s.id === this.activeSceneId
                 ? { ...s, entities: this.entities, entityColors: this.entityColors, colorIndex: this.colorIndex, currentTimeMs: this.currentTimeMs }
@@ -196,8 +205,9 @@ class EditorState
     /** Create a new scene entry and mark it as active. Does NOT load canvas. */
     addScene(file: File): SceneData
     {
-        // Si este archivo ya se dibujó antes, vuelve con sus entidades y su id
-        const saved = this.savedSceneFor(file.name);
+        // Si este archivo ya se conocía (dibujado o importado), vuelve con sus
+        // entidades y su id; el id importa aunque esté vacía, por las flechas
+        const saved = this.getLibrary()[file.name] ?? null;
         const id = saved && !this.scenes.some(s => s.id === saved.id) ? saved.id : generateId();
         const mediaType: MediaType = file.type.startsWith('video/') ? 'video' : 'image';
         const scene: SceneData = {
