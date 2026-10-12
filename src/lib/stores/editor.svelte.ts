@@ -1,7 +1,7 @@
 import type { Entity, EntityPath } from '$lib/models';
 import { HitAction } from '$lib/values';
 import { generateId } from '$lib/utils';
-import { saveWorkspace, loadWorkspace, type WorkspaceData, type SavedScene } from './persistence';
+import { saveWorkspace, loadWorkspace, type WorkspaceData } from './persistence';
 
 export type ToolMode = 'none' | 'draw' | 'select' | 'modify' | 'delete';
 export type DrawMode = 'polygon' | 'lasso';
@@ -63,128 +63,14 @@ class EditorState
 
     // ── Persistence ──────────────────────────────────────────────────────
 
-    /**
-     * Escenas guardadas, por nombre de archivo. Incluye las que todavía no se
-     * volvieron a cargar en esta sesión, para no perderlas al guardar.
-     */
-    private library: Record<string, SavedScene> | null = null;
-
-    /**
-     * Escena que ya terminó de cargar en el lienzo. Mientras una escena carga,
-     * `entities` todavía tiene lo de la anterior (o nada): en ese rato no se
-     * guarda nada de ella, para no pisarla con datos que no son suyos.
-     */
-    liveSceneId: string | null = null;
-
-    private getLibrary(): Record<string, SavedScene>
-    {
-        if (!this.library)
-        {
-            this.library = {};
-            for (const s of loadWorkspace()?.scenes ?? [])
-                this.library[s.mediaName] = s;
-        }
-        return this.library;
-    }
-
-    /** Lo guardado para un archivo, si existe y tiene algo dibujado */
-    savedSceneFor(mediaName: string): SavedScene | null
-    {
-        const s = this.getLibrary()[mediaName];
-        return s && s.entities.length > 0 ? s : null;
-    }
-
     private persist(): void
     {
-        const lib = this.getLibrary();
-        for (const s of this.scenes)
-        {
-            const live = s.id === this.activeSceneId && s.id === this.liveSceneId;
-            lib[s.mediaName] = {
-                id: s.id,
-                mediaName: s.mediaName,
-                mediaType: s.mediaType,
-                entities: live ? this.entities : s.entities,
-                entityColors: live ? this.entityColors : s.entityColors,
-                colorIndex: live ? this.colorIndex : s.colorIndex,
-            };
-        }
         saveWorkspace({
             entities: this.entities,
             entityColors: this.entityColors,
             mediaName: this.mediaName,
             mediaType: this.mediaType,
-            scenes: Object.values(lib),
         });
-    }
-
-    /** Olvida lo guardado de un archivo ("Empezar limpio" en esa escena) */
-    forgetSaved(mediaName: string): void
-    {
-        delete this.getLibrary()[mediaName];
-        this.scenes = this.scenes.map(s => s.mediaName === mediaName
-            ? { ...s, entities: [], entityColors: {}, colorIndex: 0 }
-            : s);
-        this.persist();
-    }
-
-    /** Guarda ya (por ejemplo después de restaurar o importar escenas) */
-    saveNow(): void
-    {
-        this.persist();
-    }
-
-    /**
-     * Importar un scenario.json: guarda lo de TODOS sus archivos. Las escenas
-     * ya abiertas que coincidan por nombre se llenan; las demás se llenarán
-     * solas cuando se carguen. Devuelve cuántas escenas trae el archivo.
-     */
-    importScenarioFiles(files: { id: string; file_path: string; entities: Entity[] }[]): number
-    {
-        const lib = this.getLibrary();
-        const idMap: Record<string, string> = {};
-
-        for (const f of files)
-        {
-            if (!f.file_path) continue;
-            const entityColors: Record<string, string> = {};
-            const entities = (f.entities ?? []).map((e, i) =>
-            {
-                const id = e.id || generateId();
-                entityColors[id] = ENTITY_COLORS[i % ENTITY_COLORS.length];
-                return { ...e, id, paths: (e.paths ?? []).map(p => ({ ...p, id: p.id || generateId() })) };
-            });
-            const mediaType: MediaType = /\.(mp4|webm|mov|mkv|avi)$/i.test(f.file_path) ? 'video' : 'image';
-            lib[f.file_path] = { id: f.id, mediaName: f.file_path, mediaType, entities, entityColors, colorIndex: entities.length };
-
-            // Escena ya abierta con ese archivo: toma el id del json (para las flechas)
-            const open = this.scenes.find(s => s.mediaName === f.file_path);
-            if (open && f.id && open.id !== f.id && !this.scenes.some(s => s.id === f.id))
-                idMap[open.id] = f.id;
-        }
-
-        // Cambiar ids de escenas abiertas y de las flechas que apuntaban a ellas
-        if (Object.keys(idMap).length > 0)
-        {
-            const remap = (list: Entity[]) => list.map(e =>
-                e.next_scene_id && idMap[e.next_scene_id] ? { ...e, next_scene_id: idMap[e.next_scene_id] } : e);
-            this.scenes = this.scenes.map(s => ({ ...s, id: idMap[s.id] ?? s.id, entities: remap(s.entities) }));
-            this.entities = remap(this.entities);
-            if (this.activeSceneId && idMap[this.activeSceneId])
-                this.activeSceneId = idMap[this.activeSceneId];
-            if (this.liveSceneId && idMap[this.liveSceneId])
-                this.liveSceneId = idMap[this.liveSceneId];
-        }
-
-        // Escenas abiertas que no son la activa: se llenan con lo importado
-        this.scenes = this.scenes.map(s =>
-        {
-            const saved = lib[s.mediaName];
-            if (!saved || s.id === this.activeSceneId) return s;
-            return { ...s, entities: saved.entities, entityColors: saved.entityColors, colorIndex: saved.colorIndex };
-        });
-
-        return files.filter(f => f.file_path).length;
     }
 
     loadSavedWorkspace(): WorkspaceData | null
@@ -204,7 +90,7 @@ class EditorState
     /** Save current entity state into the active scene snapshot */
     flushToActiveScene(): void
     {
-        if (!this.activeSceneId || this.activeSceneId !== this.liveSceneId) return;
+        if (!this.activeSceneId) return;
         this.scenes = this.scenes.map(s =>
             s.id === this.activeSceneId
                 ? { ...s, entities: this.entities, entityColors: this.entityColors, colorIndex: this.colorIndex, currentTimeMs: this.currentTimeMs }
@@ -215,19 +101,16 @@ class EditorState
     /** Create a new scene entry and mark it as active. Does NOT load canvas. */
     addScene(file: File): SceneData
     {
-        // Si este archivo ya se conocía (dibujado o importado), vuelve con sus
-        // entidades y su id; el id importa aunque esté vacía, por las flechas
-        const saved = this.getLibrary()[file.name] ?? null;
-        const id = saved && !this.scenes.some(s => s.id === saved.id) ? saved.id : generateId();
+        const id = generateId();
         const mediaType: MediaType = file.type.startsWith('video/') ? 'video' : 'image';
         const scene: SceneData = {
             id,
             file,
             mediaName: file.name,
             mediaType,
-            entities: saved?.entities ?? [],
-            entityColors: saved?.entityColors ?? {},
-            colorIndex: saved?.colorIndex ?? 0,
+            entities: [],
+            entityColors: {},
+            colorIndex: 0,
             currentTimeMs: 0,
         };
         this.scenes = [...this.scenes, scene];

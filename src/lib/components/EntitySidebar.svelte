@@ -1,16 +1,15 @@
 <script lang="ts">
     import { editor } from '$lib/stores/editor.svelte';
     import { HitAction } from '$lib/values';
-    import { Plus, X, Download, Upload, Trash2, CloudUpload, CloudDownload } from '@lucide/svelte';
+    import { Plus, X, Download, Upload, Trash2, CloudUpload } from '@lucide/svelte';
 
-    let { onDeletePath, onDeleteEntity, onExport, onImport, onPublish, publishing, onOpenPublished }: {
+    let { onDeletePath, onDeleteEntity, onExport, onImport, onPublish, publishing }: {
         onDeletePath: (id: string) => void;
         onDeleteEntity: (entityId: string) => void;
         onExport: () => void;
         onImport: () => void;
         onPublish: () => void;
         publishing: boolean;
-        onOpenPublished?: () => void;
     } = $props();
 
     let entityListEl: HTMLDivElement | undefined = $state();
@@ -131,15 +130,6 @@
             >
                 <CloudUpload size={16} /> {publishing ? 'Publicando...' : 'Publicar en servidor'}
             </button>
-            {#if onOpenPublished}
-                <button
-                    class="col-span-2 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors
-                           bg-surface-800 text-surface-300 hover:bg-surface-700 border border-transparent"
-                    onclick={() => { editor.closeSidebar(); onOpenPublished?.(); }}
-                >
-                    <CloudDownload size={16} /> Abrir escenario publicado
-                </button>
-            {/if}
             
         </div>
 
