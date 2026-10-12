@@ -30,7 +30,8 @@
     function tryRestore(): void
     {
         const saved = editor.loadSavedWorkspace();
-        if (!saved || saved.entities.length === 0) return;
+        // Formato nuevo: cada escena se restaura sola al cargar su archivo
+        if (!saved || saved.scenes || saved.entities.length === 0) return;
 
         if (saved.mediaName === editor.mediaName)
             applyRestore(saved);
@@ -111,9 +112,18 @@
         const isFirst = editor.scenes.length === 0;
         const scene = editor.addScene(file);
 
-        // For new (empty) scenes we don't need to restore anything.
-        // For the first scene, try to restore a previously saved workspace.
-        const onReady = isFirst ? () => tryRestore() : undefined;
+        // Si este archivo ya se había dibujado (por nombre), vuelven sus entidades.
+        // Si no, en la primera escena se intenta el guardado viejo de una sola escena.
+        let onReady: (() => void) | undefined;
+        if (scene.entities.length > 0)
+            onReady = () =>
+            {
+                restoreSceneVisuals(scene);
+                editor.saveNow();
+                editor.showToast(`${scene.mediaName}: se recuperaron ${scene.entities.length} entidades`);
+            };
+        else if (isFirst)
+            onReady = () => tryRestore();
         loadSceneIntoCanvas(file, scene.id, onReady);
     }
 
@@ -455,10 +465,17 @@
                 const scenario = JSON.parse(ev.target?.result as string) as HitScenario;
                 if (!scenario.files || scenario.files.length === 0) return;
 
-                const hitFile = scenario.files.find(f => f.file_path === editor.mediaName)
-                    ?? scenario.files[0];
+                // Se guardan TODAS las escenas del json, no solo la abierta
+                const total = editor.importScenarioFiles(scenario.files);
 
-                applyImportedFile(hitFile);
+                const hitFile = scenario.files.find(f => f.file_path === editor.mediaName)
+                    ?? (scenario.files.length === 1 ? scenario.files[0] : undefined);
+
+                if (hitFile) applyImportedFile(hitFile);
+                editor.saveNow();
+                editor.showToast(total > 1
+                    ? `Importadas ${total} escenas. Carga las demás imágenes y aparecen dibujadas.`
+                    : 'Escena importada');
             }
             catch { /* invalid JSON */ }
         };
