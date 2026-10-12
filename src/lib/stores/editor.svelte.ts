@@ -118,6 +118,16 @@ class EditorState
         });
     }
 
+    /** Olvida lo guardado de un archivo ("Empezar limpio" en esa escena) */
+    forgetSaved(mediaName: string): void
+    {
+        delete this.getLibrary()[mediaName];
+        this.scenes = this.scenes.map(s => s.mediaName === mediaName
+            ? { ...s, entities: [], entityColors: {}, colorIndex: 0 }
+            : s);
+        this.persist();
+    }
+
     /** Guarda ya (por ejemplo después de restaurar o importar escenas) */
     saveNow(): void
     {

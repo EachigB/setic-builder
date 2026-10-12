@@ -27,6 +27,28 @@
         currentMediaName: string;
     }>({ show: false, savedData: null, currentMediaName: '' });
 
+    /** Diálogo "¿Restaurar?" de una escena que ya tenía trabajo guardado */
+    let sceneRestore = $state<{ show: boolean; scene: SceneData | null; count: number }>({ show: false, scene: null, count: 0 });
+
+    function acceptSceneRestore(): void
+    {
+        const scene = sceneRestore.scene;
+        sceneRestore = { show: false, scene: null, count: 0 };
+        if (!scene || editor.activeSceneId !== scene.id) return;
+        restoreSceneVisuals(scene);
+        editor.liveSceneId = scene.id;
+        editor.saveNow();
+    }
+
+    function declineSceneRestore(): void
+    {
+        const scene = sceneRestore.scene;
+        sceneRestore = { show: false, scene: null, count: 0 };
+        if (!scene) return;
+        editor.liveSceneId = scene.id;
+        editor.forgetSaved(scene.mediaName);
+    }
+
     function tryRestore(): void
     {
         const saved = editor.loadSavedWorkspace();
@@ -120,12 +142,17 @@
         // Si no, en la primera escena se intenta el guardado viejo de una sola escena.
         const onReady = () =>
         {
+            if (scene.entities.length > 0 && !done)
+            {
+                // Había trabajo guardado de este archivo: preguntar, escena por escena
+                sceneRestore = { show: true, scene, count: scene.entities.length };
+                return;
+            }
             editor.liveSceneId = scene.id;
             if (scene.entities.length > 0)
             {
                 restoreSceneVisuals(scene);
                 editor.saveNow();
-                if (!done) editor.showToast(`${scene.mediaName}: se recuperaron ${scene.entities.length} entidades`);
             }
             else if (isFirst && !done)
                 tryRestore();
@@ -881,6 +908,29 @@
                     >Cerrar</button>
                 </div>
             {/if}
+        </div>
+    </div>
+{/if}
+
+{#if sceneRestore.show && sceneRestore.scene}
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <div class="bg-surface-800 rounded-xl p-6 max-w-md mx-4 shadow-2xl border border-surface-600">
+            <h3 class="text-lg font-semibold text-surface-100 mb-2">Trabajo guardado encontrado</h3>
+            <p class="text-sm text-surface-300 mb-4">
+                <span class="font-mono text-primary-400">{sceneRestore.scene.mediaName}</span>
+                tiene {sceneRestore.count} {sceneRestore.count === 1 ? 'entidad guardada' : 'entidades guardadas'}.
+                ¿Deseas restaurarlas?
+            </p>
+            <div class="flex gap-3 justify-end">
+                <button
+                    class="px-4 py-2 rounded-lg text-sm bg-surface-700 hover:bg-surface-600 text-surface-300 transition-colors"
+                    onclick={declineSceneRestore}
+                >Empezar limpio</button>
+                <button
+                    class="px-4 py-2 rounded-lg text-sm bg-primary-600 hover:bg-primary-500 text-white transition-colors"
+                    onclick={acceptSceneRestore}
+                >Restaurar</button>
+            </div>
         </div>
     </div>
 {/if}
