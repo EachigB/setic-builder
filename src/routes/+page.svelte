@@ -10,6 +10,7 @@
     import { interpolatePaths, wrapPathData } from '$lib/interpolation';
     import BuilderHome from '$lib/components/BuilderHome.svelte';
     import UserBadge from '$lib/components/UserBadge.svelte';
+    import ScenarioPreview from '$lib/components/ScenarioPreview.svelte';
     import type { HitScenario, HitFile, Entity, EntityPath } from '$lib/models';
     import { clearWorkspace, type WorkspaceData } from '$lib/stores/persistence';
     import type { SceneData } from '$lib/stores/editor.svelte';
@@ -583,11 +584,15 @@
     {/if}
 
     <!-- Canvas area: grows to fill remaining space -->
-    <div class="flex-1 min-h-0">
+    <div class="flex-1 min-h-0 relative">
         <Canvas
             bind:this={canvasRef}
             onPathDblClick={handlePathDblClick}
         />
+        <!-- Vista previa: el escenario como lo jugará el tirador (abajo a la izquierda) -->
+        {#if editor.scenes.length > 0}
+            <ScenarioPreview />
+        {/if}
     </div>
 
     <!-- Command bar: visible when media is loaded -->
