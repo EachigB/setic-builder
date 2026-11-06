@@ -8,7 +8,8 @@
     import { HitAction } from '$lib/values';
     import { generateId } from '$lib/utils';
     import { interpolatePaths, wrapPathData } from '$lib/interpolation';
-    import { Film, Image } from '@lucide/svelte';
+    import BuilderHome from '$lib/components/BuilderHome.svelte';
+    import UserBadge from '$lib/components/UserBadge.svelte';
     import type { HitScenario, HitFile, Entity, EntityPath } from '$lib/models';
     import { clearWorkspace, type WorkspaceData } from '$lib/stores/persistence';
     import type { SceneData } from '$lib/stores/editor.svelte';
@@ -16,7 +17,6 @@
     import { session, login } from '$lib/services/authService';
 
     let canvasRef: Canvas;
-    let fileInputEl: HTMLInputElement;
     let jsonInputEl: HTMLInputElement;
 
     // ── Restore dialog state ─────────────────────────────────────────────────
@@ -182,23 +182,6 @@
             }
         }
     }
-
-    // ── Legacy single-file upload (initial load via overlay) ─────────────────
-
-    function handleFileSelect(e: Event): void
-    {
-        const file = (e.currentTarget as HTMLInputElement).files?.[0];
-        if (file) handleAddScene(file);
-    }
-
-    function handleDrop(e: DragEvent): void
-    {
-        e.preventDefault();
-        const file = e.dataTransfer?.files[0];
-        if (file) handleAddScene(file);
-    }
-
-    function handleDragOver(e: DragEvent): void { e.preventDefault(); }
 
     // ── Seek ──────────────────────────────────────────────────────────────────
 
@@ -627,37 +610,12 @@
 
 </div>
 
-<!-- Upload overlay (shown until the first scene is created) -->
+<!-- Bienvenida (hasta que se carga la primera escena). Trae su propio botón de sesión. -->
 {#if editor.scenes.length === 0}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-        class="fixed inset-0 z-30 flex flex-col items-center justify-center bg-surface-900"
-        ondragover={handleDragOver}
-        ondrop={handleDrop}
-    >
-        <button
-            class="flex flex-col items-center gap-4 p-12 border-2 border-dashed border-surface-600
-                   rounded-2xl hover:border-surface-400 hover:bg-surface-800/50 transition-colors cursor-pointer"
-            onclick={() => fileInputEl.click()}
-        >
-            <div class="flex gap-4 text-surface-400">
-                <Image size={40} />
-                <Film size={40} />
-            </div>
-            <div class="text-center">
-                <p class="text-lg text-surface-300">Cargar imagen o video</p>
-                <p class="text-sm text-surface-500 mt-1">Click o arrastra un archivo</p>
-                <p class="text-xs text-surface-600 mt-3">Imágenes: PNG, JPG, WebP · Videos: MP4, WebM, MOV</p>
-            </div>
-        </button>
-        <input
-            bind:this={fileInputEl}
-            type="file"
-            accept="image/*,video/*"
-            class="hidden"
-            onchange={handleFileSelect}
-        />
-    </div>
+    <BuilderHome onFile={handleAddScene} />
+{:else}
+    <!-- Sesión y botón Salir, flotando abajo a la izquierda (como el 27 de octubre) -->
+    <UserBadge />
 {/if}
 
 <!-- Hidden JSON input (always in DOM so import works when media is loaded) -->
