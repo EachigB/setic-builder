@@ -105,6 +105,20 @@ export async function updateScenario(id: string, changes: ScenarioChanges): Prom
     return res.json();
 }
 
+/**
+ * Borra el escenario del servidor con todas sus escenas y archivos.
+ * Devuelve false si ya no existía (otra persona lo borró antes).
+ * El historial de sesiones no se toca: guarda el nombre del escenario.
+ */
+export async function deleteScenario(id: string): Promise<boolean> {
+    const res = await fetch(`${API_URL}/scenarios/${id}`, { method: 'DELETE', headers: authHeaders() });
+    checkAuth(res);
+    if (res.status === 404) return false;
+    if (res.status === 403) throw new Error('Tu cuenta no tiene permiso para eliminar este escenario.');
+    if (!res.ok) throw new Error(`No se pudo eliminar el escenario (error ${res.status}). Inténtalo de nuevo.`);
+    return true;
+}
+
 /** Nombre libre entre los ocupados: "video.mp4" → "video (2).mp4", "video (3).mp4"… */
 export function uniqueName(name: string, taken: Set<string>): string {
     if (!taken.has(name)) return name;

@@ -2,14 +2,14 @@
     /**
      * Pantalla de bienvenida del Builder: se muestra mientras no hay ninguna
      * escena cargada. Explica el flujo en 3 pasos, recibe el primer archivo y
-     * lista los escenarios ya publicados para abrirlos y editarlos.
+     * lista los escenarios ya publicados para abrirlos, editarlos o eliminarlos.
      */
     import { onDestroy } from 'svelte';
-    import { Image, Film, UploadCloud, MousePointerClick, Crosshair, CloudUpload, History, Pencil, Search } from '@lucide/svelte';
+    import { Image, Film, UploadCloud, MousePointerClick, Crosshair, CloudUpload, History, Pencil, Search, Trash2 } from '@lucide/svelte';
     import UserBadge from './UserBadge.svelte';
     import { loadWorkspace } from '$lib/stores/persistence';
     import { session, canUseBuilder } from '$lib/services/authService';
-    import { fetchCoverUrl, listScenarios, type ScenarioSummary } from '$lib/services/scenarioEditService';
+    import { deleteScenario, fetchCoverUrl, listScenarios, type ScenarioSummary } from '$lib/services/scenarioEditService';
 
     let {
         onFile,
@@ -76,6 +76,70 @@
     const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     const filtered = $derived(query.trim() ? list.filter(s => norm(s.name).includes(norm(query.trim()))) : list);
 
+    // ── Eliminar un escenario, con doble confirmación ─────────────────────
+    // 1.ª: qué se pierde. 2.ª: escribir el nombre del escenario (como al
+    // eliminar un tirador en SETIC Virt). Sin la segunda no se borra nada.
+
+    let del = $state<{ s: ScenarioSummary; step: 1 | 2; typed: string; busy: boolean; error: string } | null>(null);
+    let notice = $state('');
+    let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+
+    /** Mismo nombre sin importar mayúsculas, tildes ni espacios de más */
+    const sameName = (a: string, b: string) => {
+        const n = (t: string) => norm(t).replace(/\s+/g, ' ').trim();
+        return n(a) === n(b);
+    };
+    const nameOk = $derived(!!del && sameName(del.typed, del.s.name));
+
+    function askDelete(s: ScenarioSummary): void {
+        del = { s, step: 1, typed: '', busy: false, error: '' };
+    }
+
+    function closeDelete(): void {
+        if (!del?.busy) del = null;
+    }
+
+    async function confirmDelete(): Promise<void> {
+        if (!del || del.busy || !nameOk) return;
+        const s = del.s;
+        del.busy = true;
+        del.error = '';
+        try {
+            const existed = await deleteScenario(s.id);
+            list = list.filter(x => x.id !== s.id);
+            if (covers[s.id]) {
+                URL.revokeObjectURL(covers[s.id]);
+                const rest = { ...covers };
+                delete rest[s.id];
+                covers = rest;
+            }
+            del = null;
+            showNotice(existed ? `«${s.name}» se eliminó.` : `«${s.name}» ya no estaba en el servidor; se quitó de la lista.`);
+        } catch (e) {
+            if (del) {
+                del.busy = false;
+                del.error = (e as Error).message;
+            }
+        }
+    }
+
+    function showNotice(text: string): void {
+        notice = text;
+        clearTimeout(noticeTimer);
+        noticeTimer = setTimeout(() => (notice = ''), 6000);
+    }
+
+    onDestroy(() => clearTimeout(noticeTimer));
+
+    /** Al aparecer: en la 1.ª confirmación, el foco va a Cancelar (Enter no borra); en la 2.ª, a la casilla */
+    function focusOnMount(node: HTMLElement): void {
+        node.focus();
+    }
+
+    function onWindowKey(e: KeyboardEvent): void {
+        if (e.key === 'Escape' && del) closeDelete();
+    }
+
     function fmtDate(iso?: string): string {
         const t = iso ? Date.parse(iso) : NaN;
         if (!Number.isFinite(t)) return '';
@@ -135,6 +199,8 @@
         { icon: CloudUpload, title: 'Publica', text: 'Aparece al instante en la lista de escenarios de todos los polígonos SETIC Virt.' },
     ];
 </script>
+
+<svelte:window onkeydown={onWindowKey} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
@@ -221,7 +287,7 @@
             <div class="library__head">
                 <div>
                     <p class="steps__label library__label">Escenarios publicados</p>
-                    <p class="library__sub">Ábrelo, cambia los objetivos o las escenas y guarda: se actualiza en todos los polígonos.</p>
+                    <p class="library__sub">Ábrelo, cambia los objetivos o las escenas y guarda: se actualiza en todos los polígonos. También puedes eliminarlo.</p>
                 </div>
                 {#if listState === 'ready' && list.length > 6}
                     <label class="library__search">
@@ -230,6 +296,10 @@
                     </label>
                 {/if}
             </div>
+
+            {#if notice}
+                <p class="library__notice" role="status"><Trash2 size={15} /> {notice}</p>
+            {/if}
 
             {#if listState === 'loading'}
                 <p class="library__note">Cargando escenarios…</p>
@@ -258,14 +328,64 @@
                                     {#if fmtDate(s.updatedAt ?? s.createdAt)} · {fmtDate(s.updatedAt ?? s.createdAt)}{/if}
                                 </p>
                             </div>
-                            <button class="card__edit" onclick={() => onEdit?.(s)}>
-                                <Pencil size={14} /> Editar
-                            </button>
+                            <div class="card__actions">
+                                <button class="card__edit" onclick={() => onEdit?.(s)}>
+                                    <Pencil size={14} /> Editar
+                                </button>
+                                <button class="card__delete" onclick={() => askDelete(s)} title="Eliminar este escenario">
+                                    <Trash2 size={14} /> Eliminar
+                                </button>
+                            </div>
                         </article>
                     {/each}
                 </div>
             {/if}
         </section>
+    {/if}
+
+    {#if del}
+        <div class="dlg" role="presentation">
+            <div class="dlg__box" role="alertdialog" aria-modal="true" aria-labelledby="del-title">
+                <span class="dlg__icon"><Trash2 size={22} /></span>
+                <p class="dlg__step">Confirmación {del.step} de 2</p>
+                {#if del.step === 1}
+                    <h3 id="del-title" class="dlg__title">¿Eliminar «{del.s.name}»?</h3>
+                    <p class="dlg__text">
+                        Se borra del servidor con todas sus escenas, videos y objetivos, y deja de aparecer
+                        en todos los polígonos. <b>No se puede deshacer.</b>
+                    </p>
+                    {#if del.s.organizationId}
+                        <p class="dlg__text dlg__text--warn">Es un escenario de un cliente: también desaparece de su lista.</p>
+                    {/if}
+                    <p class="dlg__text dlg__text--dim">El historial de los ejercicios que ya se jugaron con él se conserva.</p>
+                    <div class="dlg__actions">
+                        <button class="dlg__btn" use:focusOnMount onclick={closeDelete}>Cancelar</button>
+                        <button class="dlg__btn dlg__btn--danger" onclick={() => { if (del) del.step = 2; }}>Sí, eliminar</button>
+                    </div>
+                {:else}
+                    <h3 id="del-title" class="dlg__title">Escribe el nombre para confirmar</h3>
+                    <p class="dlg__text">Para eliminar definitivamente <b>«{del.s.name}»</b>, escribe su nombre:</p>
+                    <form onsubmit={(e) => { e.preventDefault(); confirmDelete(); }}>
+                        <input
+                            class="dlg__input"
+                            bind:value={del.typed}
+                            placeholder={del.s.name}
+                            autocomplete="off"
+                            spellcheck="false"
+                            disabled={del.busy}
+                            use:focusOnMount
+                        />
+                        {#if del.error}<p class="dlg__error">{del.error}</p>{/if}
+                        <div class="dlg__actions">
+                            <button type="button" class="dlg__btn" onclick={closeDelete} disabled={del.busy}>Cancelar</button>
+                            <button type="submit" class="dlg__btn dlg__btn--danger dlg__btn--wide" disabled={!nameOk || del.busy}>
+                                {del.busy ? 'Eliminando…' : 'Eliminar definitivamente'}
+                            </button>
+                        </div>
+                    </form>
+                {/if}
+            </div>
+        </div>
     {/if}
 </div>
 
@@ -591,13 +711,16 @@
         text-overflow: ellipsis;
     }
     .card__meta { margin: 0.2rem 0 0; font-size: 0.76rem; color: #8b93a7; }
-    .card__edit {
+    .card__actions { display: flex; gap: 0.5rem; margin: 0.7rem 0.85rem 0.85rem; }
+    .card__edit,
+    .card__delete {
+        flex: 1;
+        min-width: 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 0.4rem;
-        margin: 0.7rem 0.85rem 0.85rem;
-        padding: 0.5rem 0.8rem;
+        padding: 0.5rem 0.5rem;
         border-radius: 10px;
         border: 1px solid rgba(224, 17, 43, 0.55);
         background: rgba(224, 17, 43, 0.12);
@@ -609,6 +732,100 @@
         transition: background 0.15s, border-color 0.15s;
     }
     .card__edit:hover { background: rgba(224, 17, 43, 0.25); border-color: #e0112b; color: #fff; }
+    /* Eliminar: discreto hasta pasar el mouse, para no competir con Editar */
+    .card__delete { border-color: #2b3446; background: transparent; color: #9aa3b5; font-weight: 600; }
+    .card__delete:hover { border-color: #dc2626; background: rgba(220, 38, 38, 0.12); color: #fca5a5; }
+
+    .library__notice {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0 0 1rem;
+        padding: 0.6rem 0.9rem;
+        border-radius: 10px;
+        border: 1px solid rgba(34, 197, 94, 0.35);
+        background: rgba(34, 197, 94, 0.08);
+        color: #bbf7d0;
+        font-size: 0.88rem;
+    }
+
+    /* Confirmación (mismo estilo que la de Salir) */
+    .dlg {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.7);
+    }
+    .dlg__box {
+        width: 100%;
+        max-width: 28rem;
+        padding: 1.6rem;
+        text-align: center;
+        background: #161b26;
+        border: 1px solid #2b3446;
+        border-radius: 12px;
+        color: #e6e9ef;
+        box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.9);
+    }
+    .dlg__icon {
+        display: inline-grid;
+        place-items: center;
+        width: 3rem;
+        height: 3rem;
+        margin-bottom: 0.5rem;
+        border-radius: 50%;
+        background: rgba(220, 38, 38, 0.15);
+        color: #f87171;
+    }
+    .dlg__step {
+        margin: 0 0 0.4rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #f87171;
+    }
+    .dlg__title { margin: 0 0 0.6rem; font-size: 1.15rem; font-weight: 700; overflow-wrap: anywhere; }
+    .dlg__text { margin: 0 0 0.5rem; font-size: 0.9rem; line-height: 1.5; color: #c4cad6; overflow-wrap: anywhere; }
+    .dlg__text b { color: #fff; }
+    .dlg__text--warn { color: #fcd34d; }
+    .dlg__text--dim { font-size: 0.82rem; color: #8b93a7; }
+    .dlg__input {
+        width: 100%;
+        margin-top: 0.4rem;
+        padding: 0.6rem 0.75rem;
+        border-radius: 8px;
+        border: 1px solid #34405a;
+        background: #0f131b;
+        color: #e6e9ef;
+        font: inherit;
+        font-size: 0.92rem;
+        text-align: center;
+    }
+    .dlg__input:focus { outline: 2px solid #dc2626; outline-offset: 1px; }
+    .dlg__error { margin: 0.6rem 0 0; font-size: 0.85rem; color: #fca5a5; }
+    .dlg__actions { display: flex; gap: 0.6rem; margin-top: 1.1rem; }
+    .dlg__btn {
+        flex: 1;
+        padding: 0.7rem;
+        border: none;
+        border-radius: 8px;
+        background: #2b3446;
+        color: #e6e9ef;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .dlg__btn:hover { background: #36415a; }
+    .dlg__btn--danger { background: #dc2626; color: #fff; }
+    .dlg__btn--danger:hover { background: #b91c1c; }
+    .dlg__btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .dlg__btn--danger:disabled:hover { background: #dc2626; }
+    .dlg__btn--wide { flex: 1.7; white-space: nowrap; }
 
     @media (max-width: 860px) {
         .home__main { grid-template-columns: 1fr; gap: 2rem; padding: 2rem 1rem; }
