@@ -4,7 +4,7 @@
     import VideoTimeline from '$lib/components/VideoTimeline.svelte';
     import CommandBar from '$lib/components/CommandBar.svelte';
     import SceneBar from '$lib/components/SceneBar.svelte';
-    import { editor } from '$lib/stores/editor.svelte';
+    import { editor, ENTITY_COLORS } from '$lib/stores/editor.svelte';
     import { HitAction } from '$lib/values';
     import { generateId } from '$lib/utils';
     import { interpolatePaths, wrapPathData } from '$lib/interpolation';
@@ -15,7 +15,11 @@
     import { clearWorkspace, type WorkspaceData } from '$lib/stores/persistence';
     import type { SceneData } from '$lib/stores/editor.svelte';
     import { saveScenario, uploadMedia } from '$lib/services/apiService';
-    import { session, login } from '$lib/services/authService';
+    import { session, login, canUseBuilder } from '$lib/services/authService';
+    import {
+        COVER_NAME, downloadMedia, getScenario, uniqueName, updateScenario, type ScenarioSummary,
+    } from '$lib/services/scenarioEditService';
+    import { get } from 'svelte/store';
 
     let canvasRef: Canvas;
     let jsonInputEl: HTMLInputElement;
@@ -320,6 +324,219 @@
     let pubStage = $state<'form' | 'working' | 'done' | 'error'>('form');
     let pubCover = $state<Blob | null>(null);
     let pubCoverUrl = $state('');
+    /** 'update' = guardar cambios en el escenario que se está editando */
+    let pubMode = $state<'create' | 'update'>('create');
+
+    // ── Editar un escenario ya publicado ──────────────────────────────────────
+    //
+    // Al abrir uno, sus escenas se cargan con el mismo id que tenían: así los
+    // objetivos que pasan a otra escena (next_scene_id) siguen funcionando.
+    // "Guardar cambios" actualiza ese mismo escenario en el servidor, y solo
+    // sube los archivos de escenas nuevas.
+
+    interface EditTarget {
+        /** id del escenario en el servidor */
+        id: string;
+        name: string;
+        description: string;
+        /** id interno de los datos (HitScenario.id), se conserva */
+        dataId: string;
+    }
+
+    let editing = $state<EditTarget | null>(null);
+    /** Escenas cuyo archivo ya está en el servidor (no se vuelve a subir) */
+    let serverScenes = new Set<string>();
+    /** Nombres de archivo que ya usa el escenario en el servidor */
+    let serverFiles = new Set<string>();
+    /** Pantalla de carga al abrir un escenario */
+    let opening = $state<{ name: string; msg: string; error: string } | null>(null);
+
+    // Si se quitan todas las escenas, se vuelve al inicio y se deja de editar
+    $effect(() => {
+        if (editor.scenes.length === 0 && !opening) editing = null;
+    });
+
+    async function openForEdit(summary: ScenarioSummary): Promise<void>
+    {
+        if (!canUseBuilder(get(session))) return;
+        opening = { name: summary.name, msg: 'Abriendo…', error: '' };
+        try {
+            const sc = await getScenario(summary.id);
+            const data = sc.data;
+            if (!data || !Array.isArray(data.files) || data.files.length === 0)
+                throw new Error('Este escenario no tiene escenas que se puedan editar en el Builder.');
+
+            // 1. Bajar el archivo de cada escena
+            const scenes: SceneData[] = [];
+            for (let i = 0; i < data.files.length; i++) {
+                const f = data.files[i];
+                opening = { ...opening!, msg: `Descargando ${f.file_path} (${i + 1} de ${data.files.length})…` };
+                const file = await downloadMedia(sc.id, f.file_path);
+                const raw = f as any;
+                const entities: Entity[] = (f.entities?.length ? f.entities : convertLegacyPaths(raw.paths ?? []))
+                    .map(e => ({ ...e, paths: e.paths.map(p => ({ ...p, id: p.id || generateId() })) }));
+                scenes.push({
+                    id: f.id || generateId(),
+                    file,
+                    mediaName: f.file_path,
+                    mediaType: file.type.startsWith('video/') ? 'video' : 'image',
+                    entities,
+                    entityColors: Object.fromEntries(entities.map((e, k) => [e.id, ENTITY_COLORS[k % ENTITY_COLORS.length]])),
+                    colorIndex: entities.length,
+                    currentTimeMs: 0,
+                });
+            }
+
+            // 2. Reemplazar lo que haya en el editor por este escenario
+            if (editor.scenes.length > 0) canvasRef.clearAllVisuals();
+            editor.scenes = scenes;
+            serverScenes = new Set(scenes.map(s => s.id));
+            serverFiles = new Set(sc.media.map(m => m.fileName));
+            editing = {
+                id: sc.id,
+                name: sc.name,
+                description: sc.description ?? '',
+                dataId: data.id || generateId(),
+            };
+
+            // 3. Mostrar la primera escena con sus objetivos
+            const first = scenes[0];
+            editor.activeSceneId = first.id;
+            editor.mediaName = first.mediaName;
+            editor.mediaType = first.mediaType;
+            editor.isPlaying = false;
+            editor.selectedEntityId = null;
+            editor.selectedPathIndex = -1;
+            loadSceneIntoCanvas(first.file!, first.id, () => {
+                restoreSceneVisuals(first);
+                if (first.entities.length > 0) editor.sidebarOpen = true;
+            });
+            opening = null;
+        } catch (e) {
+            opening = { ...opening!, error: (e as Error).message };
+        }
+    }
+
+    /**
+     * Nombre con el que cada escena queda en el servidor, y los archivos que
+     * hay que subir. Con keepServer, las escenas que ya están en el servidor
+     * conservan su nombre y no se suben; las demás reciben un nombre que no
+     * choca con ningún otro (el servidor reemplaza un archivo si se repite).
+     */
+    function planNames(keepServer: boolean): { names: Map<string, string>; uploads: File[] }
+    {
+        const taken = new Set<string>([COVER_NAME]);
+        const names = new Map<string, string>();
+        const uploads: File[] = [];
+        if (keepServer) {
+            for (const scene of editor.scenes) {
+                if (!serverScenes.has(scene.id)) continue;
+                names.set(scene.id, scene.mediaName);
+                taken.add(scene.mediaName);
+            }
+            for (const name of serverFiles) taken.add(name);
+        }
+        for (const scene of editor.scenes) {
+            if (names.has(scene.id) || !scene.file) continue;
+            const fileName = uniqueName(scene.mediaName, taken);
+            taken.add(fileName);
+            names.set(scene.id, fileName);
+            uploads.push(fileName === scene.file.name
+                ? scene.file
+                : new File([scene.file], fileName, { type: scene.file.type }));
+        }
+        return { names, uploads };
+    }
+
+    /** Escenas listas para guardar: la activa toma sus objetivos del editor. */
+    function exportFiles(names?: Map<string, string>): HitFile[]
+    {
+        return editor.scenes.map(scene => {
+            const source = scene.id === editor.activeSceneId
+                ? editor.entities
+                : scene.entities;
+
+            const exportEntities: Entity[] = source
+                .map(e => ({ ...e, paths: e.paths.filter(p => !!p.path) }))
+                .filter(e => e.paths.length > 0);
+
+            return {
+                id: scene.id,
+                file_path: names?.get(scene.id) ?? scene.mediaName,
+                timeout_sec: 0,
+                timeout_action: HitAction.NONE,
+                entities: exportEntities,
+                video_settings: scene.mediaType === 'video' ? { loop: false } : null,
+            };
+        });
+    }
+
+    /** Guardar cambios: actualiza el mismo escenario en el servidor. */
+    async function doSave(name: string, description: string): Promise<void>
+    {
+        const target = editing;
+        if (!target) return;
+        publishing = true;
+        publishMsg = '';
+
+        try {
+            // Solo se suben las escenas nuevas, con un nombre que no choque
+            const { names, uploads } = planNames(true);
+            const files = exportFiles(names);
+            const scenario: HitScenario = {
+                id: target.dataId,
+                title: name,
+                description,
+                viewbox_w: editor.mediaWidth,
+                viewbox_h: editor.mediaHeight,
+                files,
+            };
+
+            // 1. Archivos de las escenas nuevas
+            for (let i = 0; i < uploads.length; i++) {
+                publishMsg = `Subiendo ${uploads[i].name} (${i + 1}/${uploads.length})...`;
+                await uploadMedia(target.id, uploads[i]);
+            }
+
+            // 2. Portada (reemplaza la anterior)
+            if (pubCover) {
+                publishMsg = 'Subiendo portada...';
+                await uploadMedia(target.id, new File([pubCover], COVER_NAME, { type: 'image/jpeg' }));
+            }
+
+            // 3. Objetivos y escenas. El servidor borra los archivos que ya no usa ninguna escena.
+            publishMsg = 'Guardando cambios...';
+            await updateScenario(target.id, { name, description, data: scenario, pruneMedia: true });
+
+            // Lo subido ya está en el servidor: el próximo guardado no lo repite
+            markSaved(target.id, name, description, target.dataId, names);
+            publishMsg = '';
+            pubStage = 'done';
+        } catch (e) {
+            publishMsg = '';
+            pubError = (e as Error).message;
+            pubStage = 'error';
+        } finally {
+            publishing = false;
+        }
+    }
+
+    /** Después de guardar o publicar: lo que hay en el editor es ese escenario del servidor. */
+    function markSaved(id: string, name: string, description: string, dataId: string, names: Map<string, string>): void
+    {
+        // El archivo de cada escena queda con el mismo nombre que tiene en el servidor
+        editor.scenes = editor.scenes.map(s => {
+            const fileName = names.get(s.id);
+            if (!fileName || fileName === s.mediaName) return s;
+            const file = s.file ? new File([s.file], fileName, { type: s.file.type }) : s.file;
+            return { ...s, mediaName: fileName, file };
+        });
+        const active = editor.scenes.find(s => s.id === editor.activeSceneId);
+        if (active) editor.mediaName = active.mediaName;
+        serverScenes = new Set(editor.scenes.map(s => s.id));
+        serverFiles = new Set([...editor.scenes.map(s => s.mediaName), COVER_NAME]);
+        editing = { id, name, description, dataId };
+    }
 
     function countTargets(): number {
         return editor.entities.length
@@ -336,8 +553,9 @@
         if (pubCoverUrl) URL.revokeObjectURL(pubCoverUrl);
         pubCoverUrl = pubCover ? URL.createObjectURL(pubCover) : '';
 
-        pubName = editor.scenes[0]?.mediaName.replace(/\.[^.]+$/, '') || 'escenario';
-        pubDesc = '';
+        pubMode = editing ? 'update' : 'create';
+        pubName = editing?.name ?? (editor.scenes[0]?.mediaName.replace(/\.[^.]+$/, '') || 'escenario');
+        pubDesc = editing?.description ?? '';
         pubBlocked = countTargets() === 0;
         pubError = pubBlocked
             ? 'No hay objetivos trazados. Dibuja al menos uno antes de publicar.'
@@ -346,14 +564,17 @@
         publishDlg = true;
     }
 
-    function confirmPublish(): void {
+    /** mode: 'update' guarda en el mismo escenario; 'create' publica uno nuevo (o una copia). */
+    function confirmPublish(mode: 'create' | 'update' = 'create'): void {
         const name = pubName.trim();
         if (!name) {
             pubError = 'Ponle un nombre al escenario.';
             return;
         }
+        pubMode = mode;
         pubStage = 'working';
-        doPublish(name, pubDesc.trim());
+        if (mode === 'update') doSave(name, pubDesc.trim());
+        else doPublish(name, pubDesc.trim());
     }
 
     async function doPublish(name: string, description: string): Promise<void>
@@ -365,24 +586,8 @@
         try {
             // La escena activa tiene sus entidades en editor.entities; las demás,
             // en su propia copia. Hay que tomar de cada sitio lo que corresponde.
-            const files = editor.scenes.map(scene => {
-                const source = scene.id === editor.activeSceneId
-                    ? editor.entities
-                    : scene.entities;
-
-                const exportEntities: Entity[] = source
-                    .map(e => ({ ...e, paths: e.paths.filter(p => !!p.path) }))
-                    .filter(e => e.paths.length > 0);
-
-                return {
-                    id: scene.id,
-                    file_path: scene.mediaName,
-                    timeout_sec: 0,
-                    timeout_action: HitAction.NONE,
-                    entities: exportEntities,
-                    video_settings: scene.mediaType === 'video' ? { loop: false } : null,
-                };
-            });
+            const { names, uploads } = planNames(false);
+            const files = exportFiles(names);
 
             const scenario: HitScenario = {
                 id: generateId(),
@@ -398,21 +603,20 @@
             const saved = await saveScenario(name, 'full', scenario, description);
 
             // 3. Subir los archivos de cada escena
-            let done = 0;
-            const total = editor.scenes.filter(s => s.file).length;
-            for (const scene of editor.scenes) {
-                if (!scene.file) continue;
-                done++;
-                publishMsg = `Subiendo ${scene.mediaName} (${done}/${total})...`;
-                await uploadMedia(saved.id, scene.file);
+            for (let i = 0; i < uploads.length; i++) {
+                publishMsg = `Subiendo ${uploads[i].name} (${i + 1}/${uploads.length})...`;
+                await uploadMedia(saved.id, uploads[i]);
             }
 
             // 4. Portada
             if (pubCover) {
                 publishMsg = 'Subiendo portada...';
-                await uploadMedia(saved.id, new File([pubCover], '__portada.jpg', { type: 'image/jpeg' }));
+                await uploadMedia(saved.id, new File([pubCover], COVER_NAME, { type: 'image/jpeg' }));
             }
 
+            // Desde ahora se edita el escenario recién publicado: el próximo
+            // "Publicar" guarda cambios en él en vez de crear un duplicado.
+            markSaved(saved.id, name, description, scenario.id, names);
             publishMsg = '';
             pubStage = 'done';
         } catch (e) {
@@ -617,10 +821,45 @@
 
 <!-- Bienvenida (hasta que se carga la primera escena). Trae su propio botón de sesión. -->
 {#if editor.scenes.length === 0}
-    <BuilderHome onFile={handleAddScene} />
+    <BuilderHome onFile={handleAddScene} onEdit={openForEdit} />
 {:else}
     <!-- Sesión y botón Salir, flotando abajo a la izquierda (como el 27 de octubre) -->
     <UserBadge />
+{/if}
+
+<!-- Aviso: se está editando un escenario ya publicado -->
+{#if editing && editor.scenes.length > 0}
+    <div class="editing-pill" title="Publicar guarda los cambios en este mismo escenario">
+        <span class="editing-pill__dot"></span>
+        Editando <b>{editing.name}</b>
+    </div>
+{/if}
+
+<!-- Abriendo un escenario publicado -->
+{#if opening}
+    <div class="fixed inset-0 z-[450] flex items-center justify-center bg-black/75">
+        <div class="bg-surface-800 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl border border-surface-600">
+            {#if opening.error}
+                <h3 class="text-lg font-semibold text-red-400 mb-3">No se pudo abrir «{opening.name}»</h3>
+                <p class="text-sm text-surface-300">{opening.error}</p>
+                <div class="flex justify-end mt-5">
+                    <button
+                        class="px-4 py-2 rounded-lg text-sm bg-surface-700 hover:bg-surface-600 text-surface-300 transition-colors"
+                        onclick={() => (opening = null)}
+                    >
+                        Cerrar
+                    </button>
+                </div>
+            {:else}
+                <h3 class="text-lg font-semibold text-surface-100 mb-4">Abriendo «{opening.name}»</h3>
+                <p class="text-sm text-surface-300">{opening.msg}</p>
+                <div class="mt-4 h-1.5 rounded-full bg-surface-700 overflow-hidden">
+                    <div class="h-full w-1/3 bg-green-500 rounded-full pub-bar"></div>
+                </div>
+                <p class="text-xs text-surface-500 mt-4">Los videos se descargan del servidor; puede tardar un poco.</p>
+            {/if}
+        </div>
+    </div>
 {/if}
 
 <!-- Hidden JSON input (always in DOM so import works when media is loaded) -->
@@ -690,7 +929,16 @@
     <div class="fixed inset-0 z-[400] flex items-center justify-center bg-black/70">
         <div class="bg-surface-800 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl border border-surface-600">
             {#if pubStage === 'form'}
-                <h3 class="text-lg font-semibold text-surface-100 mb-4">Publicar escenario</h3>
+                <h3 class="text-lg font-semibold text-surface-100 mb-1">
+                    {pubMode === 'update' ? 'Guardar cambios' : 'Publicar escenario'}
+                </h3>
+                {#if pubMode === 'update'}
+                    <p class="text-sm text-surface-400 mb-4">
+                        Se actualiza este mismo escenario en todos los polígonos; su historial se conserva.
+                    </p>
+                {:else}
+                    <div class="mb-3"></div>
+                {/if}
 
                 {#if pubCoverUrl}
                     <img src={pubCoverUrl} alt="Portada" class="w-full rounded-lg border border-surface-600 mb-1" />
@@ -735,26 +983,51 @@
                     >
                         Cancelar
                     </button>
-                    <button
-                        class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50"
-                        onclick={confirmPublish}
-                        disabled={pubBlocked}
-                    >
-                        Publicar
-                    </button>
+                    {#if pubMode === 'update'}
+                        <button
+                            class="px-4 py-2 rounded-lg text-sm bg-surface-700 hover:bg-surface-600 text-surface-200 transition-colors disabled:opacity-50"
+                            onclick={() => confirmPublish('create')}
+                            disabled={pubBlocked}
+                            title="Publica una copia nueva y deja el original como estaba"
+                        >
+                            Guardar como nuevo
+                        </button>
+                        <button
+                            class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50"
+                            onclick={() => confirmPublish('update')}
+                            disabled={pubBlocked}
+                        >
+                            Guardar cambios
+                        </button>
+                    {:else}
+                        <button
+                            class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50"
+                            onclick={() => confirmPublish('create')}
+                            disabled={pubBlocked}
+                        >
+                            Publicar
+                        </button>
+                    {/if}
                 </div>
             {:else if pubStage === 'working'}
-                <h3 class="text-lg font-semibold text-surface-100 mb-4">Publicando…</h3>
+                <h3 class="text-lg font-semibold text-surface-100 mb-4">{pubMode === 'update' ? 'Guardando cambios…' : 'Publicando…'}</h3>
                 <p class="text-sm text-surface-300">{publishMsg || 'Preparando…'}</p>
                 <div class="mt-4 h-1.5 rounded-full bg-surface-700 overflow-hidden">
                     <div class="h-full w-1/3 bg-green-500 rounded-full pub-bar"></div>
                 </div>
                 <p class="text-xs text-surface-500 mt-4">No cierres esta ventana hasta que termine.</p>
             {:else if pubStage === 'done'}
-                <h3 class="text-lg font-semibold text-green-400 mb-3">Escenario publicado</h3>
+                <h3 class="text-lg font-semibold text-green-400 mb-3">
+                    {pubMode === 'update' ? 'Cambios guardados' : 'Escenario publicado'}
+                </h3>
                 <p class="text-sm text-surface-300">
                     <span class="font-semibold text-surface-100">{pubName}</span>
-                    ya aparece en la lista de escenarios de todos los polígonos.
+                    {pubMode === 'update'
+                        ? 'quedó actualizado. Los polígonos ven los cambios la próxima vez que lo abran.'
+                        : 'ya aparece en la lista de escenarios de todos los polígonos.'}
+                </p>
+                <p class="text-xs text-surface-500 mt-3">
+                    Si sigues editando, «Publicar» guarda los cambios en este mismo escenario.
                 </p>
                 <div class="flex justify-end mt-5">
                     <button
@@ -765,7 +1038,9 @@
                     </button>
                 </div>
             {:else if pubStage === 'error'}
-                <h3 class="text-lg font-semibold text-red-400 mb-3">No se pudo publicar</h3>
+                <h3 class="text-lg font-semibold text-red-400 mb-3">
+                    {pubMode === 'update' ? 'No se pudieron guardar los cambios' : 'No se pudo publicar'}
+                </h3>
                 <p class="text-sm text-surface-300">{pubError}</p>
                 <div class="flex gap-3 justify-end mt-5">
                     <button
@@ -787,6 +1062,29 @@
 {/if}
 
 <style>
+    .editing-pill {
+        position: fixed;
+        top: 0.45rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 40;
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        max-width: 22rem;
+        padding: 0.35rem 0.8rem;
+        border-radius: 999px;
+        border: 1px solid rgba(250, 204, 21, 0.45);
+        background: rgba(30, 27, 15, 0.92);
+        color: #fde68a;
+        font-size: 0.78rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        pointer-events: none;
+    }
+    .editing-pill b { color: #fff; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+    .editing-pill__dot { width: 0.5rem; height: 0.5rem; flex: none; border-radius: 50%; background: #facc15; }
     .pub-bar {
         animation: pubSlide 1.2s ease-in-out infinite;
     }

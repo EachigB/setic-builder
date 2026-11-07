@@ -1,13 +1,86 @@
 <script lang="ts">
     /**
      * Pantalla de bienvenida del Builder: se muestra mientras no hay ninguna
-     * escena cargada. Explica el flujo en 3 pasos y recibe el primer archivo.
+     * escena cargada. Explica el flujo en 3 pasos, recibe el primer archivo y
+     * lista los escenarios ya publicados para abrirlos y editarlos.
      */
-    import { Image, Film, UploadCloud, MousePointerClick, Crosshair, CloudUpload, History } from '@lucide/svelte';
+    import { onDestroy } from 'svelte';
+    import { Image, Film, UploadCloud, MousePointerClick, Crosshair, CloudUpload, History, Pencil, Search } from '@lucide/svelte';
     import UserBadge from './UserBadge.svelte';
     import { loadWorkspace } from '$lib/stores/persistence';
+    import { session, canUseBuilder } from '$lib/services/authService';
+    import { fetchCoverUrl, listScenarios, type ScenarioSummary } from '$lib/services/scenarioEditService';
 
-    let { onFile }: { onFile: (file: File) => void } = $props();
+    let {
+        onFile,
+        onEdit,
+    }: {
+        onFile: (file: File) => void;
+        /** Abrir un escenario publicado para editarlo */
+        onEdit?: (scenario: ScenarioSummary) => void;
+    } = $props();
+
+    // ── Escenarios publicados ────────────────────────────────────────────────
+    // Solo con una sesión que puede usar el Builder (superadmin): sin ella no
+    // se pide la lista, y el servidor tampoco dejaría guardar cambios.
+    const allowed = $derived(canUseBuilder($session));
+    let list = $state<ScenarioSummary[]>([]);
+    let listState = $state<'idle' | 'loading' | 'ready' | 'error'>('idle');
+    let listError = $state('');
+    let query = $state('');
+    let covers = $state<Record<string, string>>({});
+    const coverUrls: string[] = [];
+    let libraryEl: HTMLElement | undefined = $state();
+
+    $effect(() => {
+        if (!allowed) {
+            list = [];
+            listState = 'idle';
+            return;
+        }
+        if (listState === 'idle') loadList();
+    });
+
+    async function loadList(): Promise<void> {
+        listState = 'loading';
+        listError = '';
+        try {
+            // Los escenarios 3D se editan en el editor 3D de SETIC Virt
+            list = (await listScenarios()).filter(s => s.type !== '3d');
+            listState = 'ready';
+            loadCovers();
+        } catch (e) {
+            listError = (e as Error).message;
+            listState = 'error';
+        }
+    }
+
+    /** Portadas de a tres a la vez, para no saturar el servidor */
+    async function loadCovers(): Promise<void> {
+        const queue = list.filter(s => s.media?.length && !covers[s.id]);
+        const worker = async () => {
+            while (queue.length) {
+                const s = queue.shift()!;
+                const url = await fetchCoverUrl(s.id);
+                if (url) {
+                    coverUrls.push(url);
+                    covers = { ...covers, [s.id]: url };
+                }
+            }
+        };
+        await Promise.all([worker(), worker(), worker()]);
+    }
+
+    onDestroy(() => coverUrls.forEach(u => URL.revokeObjectURL(u)));
+
+    const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const filtered = $derived(query.trim() ? list.filter(s => norm(s.name).includes(norm(query.trim()))) : list);
+
+    function fmtDate(iso?: string): string {
+        const t = iso ? Date.parse(iso) : NaN;
+        if (!Number.isFinite(t)) return '';
+        return new Date(t).toLocaleDateString('es-EC', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
 
     let fileInputEl: HTMLInputElement;
     let dragging = $state(false);
@@ -105,6 +178,12 @@
             </button>
             <input bind:this={fileInputEl} type="file" accept="image/*,video/*" class="hidden-input" onchange={pick} />
 
+            {#if allowed && list.length > 0 && onEdit}
+                <button class="to-library" onclick={() => libraryEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                    <Pencil size={15} /> o edita uno ya publicado ({list.length})
+                </button>
+            {/if}
+
             {#if saved}
                 <div class="saved">
                     <span class="saved__icon"><History size={18} /></span>
@@ -136,6 +215,58 @@
             </p>
         </section>
     </main>
+
+    {#if allowed && onEdit}
+        <section class="library" bind:this={libraryEl} aria-label="Escenarios publicados">
+            <div class="library__head">
+                <div>
+                    <p class="steps__label library__label">Escenarios publicados</p>
+                    <p class="library__sub">Ábrelo, cambia los objetivos o las escenas y guarda: se actualiza en todos los polígonos.</p>
+                </div>
+                {#if listState === 'ready' && list.length > 6}
+                    <label class="library__search">
+                        <Search size={15} />
+                        <input bind:value={query} placeholder="Buscar por nombre" />
+                    </label>
+                {/if}
+            </div>
+
+            {#if listState === 'loading'}
+                <p class="library__note">Cargando escenarios…</p>
+            {:else if listState === 'error'}
+                <p class="library__note library__note--error">
+                    {listError}
+                    <button class="library__retry" onclick={loadList}>Reintentar</button>
+                </p>
+            {:else if listState === 'ready' && filtered.length === 0}
+                <p class="library__note">{list.length === 0 ? 'Todavía no hay escenarios publicados.' : 'Ningún escenario coincide con la búsqueda.'}</p>
+            {:else}
+                <div class="library__grid">
+                    {#each filtered as s (s.id)}
+                        <article class="card">
+                            <div class="card__thumb">
+                                {#if covers[s.id]}
+                                    <img src={covers[s.id]} alt="" />
+                                {:else}
+                                    <Film size={26} />
+                                {/if}
+                            </div>
+                            <div class="card__body">
+                                <p class="card__name" title={s.name}>{s.name}</p>
+                                <p class="card__meta">
+                                    {s.organizationId ? 'De un cliente' : 'Catálogo SETIC'}
+                                    {#if fmtDate(s.updatedAt ?? s.createdAt)} · {fmtDate(s.updatedAt ?? s.createdAt)}{/if}
+                                </p>
+                            </div>
+                            <button class="card__edit" onclick={() => onEdit?.(s)}>
+                                <Pencil size={14} /> Editar
+                            </button>
+                        </article>
+                    {/each}
+                </div>
+            {/if}
+        </section>
+    {/if}
 </div>
 
 <style>
@@ -360,8 +491,128 @@
         text-align: center;
     }
 
+    .to-library {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        margin-top: 0.9rem;
+        padding: 0.35rem 0.2rem;
+        border: 0;
+        background: none;
+        color: #c4cad6;
+        font: inherit;
+        font-size: 0.9rem;
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+    }
+    .to-library:hover { color: #fff; }
+
+    .library {
+        width: 100%;
+        max-width: 72rem;
+        margin: 0 auto;
+        padding: 0 2rem 3rem;
+        scroll-margin-top: 1rem;
+    }
+    .library__head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        padding-top: 1.6rem;
+        margin-bottom: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .library__label { margin-bottom: 0.35rem; }
+    .library__sub { margin: 0; font-size: 0.86rem; color: #9aa3b5; }
+    .library__search {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.45rem 0.7rem;
+        border-radius: 10px;
+        border: 1px solid #2b3446;
+        background: #161b26;
+        color: #8b93a7;
+    }
+    .library__search input {
+        width: 14rem;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: #e6e9ef;
+        font: inherit;
+        font-size: 0.88rem;
+    }
+    .library__note { margin: 0.5rem 0; font-size: 0.9rem; color: #9aa3b5; }
+    .library__note--error { color: #fca5a5; }
+    .library__retry {
+        margin-left: 0.6rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 8px;
+        border: 1px solid #34405a;
+        background: #1d2433;
+        color: #e6e9ef;
+        font: inherit;
+        font-size: 0.82rem;
+        cursor: pointer;
+    }
+    .library__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr));
+        gap: 1rem;
+    }
+    .card {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border-radius: 14px;
+        border: 1px solid #222a39;
+        background: rgba(17, 21, 30, 0.85);
+    }
+    .card__thumb {
+        display: grid;
+        place-items: center;
+        aspect-ratio: 16 / 9;
+        background: #0f131b;
+        color: #34405a;
+        overflow: hidden;
+    }
+    .card__thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .card__body { padding: 0.7rem 0.85rem 0.2rem; min-width: 0; }
+    .card__name {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .card__meta { margin: 0.2rem 0 0; font-size: 0.76rem; color: #8b93a7; }
+    .card__edit {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        margin: 0.7rem 0.85rem 0.85rem;
+        padding: 0.5rem 0.8rem;
+        border-radius: 10px;
+        border: 1px solid rgba(224, 17, 43, 0.55);
+        background: rgba(224, 17, 43, 0.12);
+        color: #ffd5d9;
+        font: inherit;
+        font-size: 0.86rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+    }
+    .card__edit:hover { background: rgba(224, 17, 43, 0.25); border-color: #e0112b; color: #fff; }
+
     @media (max-width: 860px) {
         .home__main { grid-template-columns: 1fr; gap: 2rem; padding: 2rem 1rem; }
         .home__top { padding: 0.8rem 1rem; }
+        .library { padding: 0 1rem 2rem; }
     }
 </style>
