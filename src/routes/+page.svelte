@@ -10,6 +10,7 @@
     import { interpolatePaths, wrapPathData } from '$lib/interpolation';
     import BuilderHome from '$lib/components/BuilderHome.svelte';
     import UserBadge from '$lib/components/UserBadge.svelte';
+    import { ArrowLeft } from '@lucide/svelte';
     import ScenarioPreview from '$lib/components/ScenarioPreview.svelte';
     import type { HitScenario, HitFile, Entity, EntityPath } from '$lib/models';
     import { clearWorkspace, type WorkspaceData } from '$lib/stores/persistence';
@@ -350,6 +351,8 @@
     let serverFiles = new Set<string>();
     /** Pantalla de carga al abrir un escenario */
     let opening = $state<{ name: string; msg: string; error: string } | null>(null);
+    /** Cómo quedó el escenario la última vez que se abrió o se guardó (para saber si hay cambios sin guardar) */
+    let savedSnapshot: string | null = null;
 
     // Si se quitan todas las escenas, se vuelve al inicio y se deja de editar
     $effect(() => {
@@ -398,6 +401,7 @@
                 description: sc.description ?? '',
                 dataId: data.id || generateId(),
             };
+            savedSnapshot = JSON.stringify(exportFiles(undefined, false));
 
             // 3. Mostrar la primera escena con sus objetivos
             const first = scenes[0];
@@ -448,11 +452,15 @@
         return { names, uploads };
     }
 
-    /** Escenas listas para guardar: la activa toma sus objetivos del editor. */
-    function exportFiles(names?: Map<string, string>): HitFile[]
+    /**
+     * Escenas listas para guardar: la activa toma sus objetivos del editor.
+     * Con live = false cada escena usa su propia copia (recién abierto el
+     * escenario, antes de que la escena activa termine de cargar).
+     */
+    function exportFiles(names?: Map<string, string>, live = true): HitFile[]
     {
         return editor.scenes.map(scene => {
-            const source = scene.id === editor.activeSceneId
+            const source = live && scene.id === editor.activeSceneId
                 ? editor.entities
                 : scene.entities;
 
@@ -536,6 +544,68 @@
         serverScenes = new Set(editor.scenes.map(s => s.id));
         serverFiles = new Set([...editor.scenes.map(s => s.mediaName), COVER_NAME]);
         editing = { id, name, description, dataId };
+        savedSnapshot = JSON.stringify(exportFiles());
+    }
+
+    // ── Volver al inicio ──────────────────────────────────────────────────────
+
+    /** Pregunta antes de volver cuando hay cambios sin guardar */
+    let backDlg = $state(false);
+    /** "Guardar cambios" desde esa pregunta: al terminar de guardar, vuelve al inicio */
+    let homeAfterSave = $state(false);
+
+    /**
+     * ¿Se perdería algo al cerrar el escenario? Si se abrió del servidor (o ya
+     * se publicó): si cambió algo desde entonces. Si es nuevo: si ya tiene objetivos.
+     */
+    function hasUnsavedChanges(): boolean
+    {
+        if (editor.scenes.length === 0) return false;
+        if (!editing) return exportFiles().some(f => f.entities.length > 0);
+        return JSON.stringify(exportFiles()) !== savedSnapshot;
+    }
+
+    function askGoHome(): void
+    {
+        if (hasUnsavedChanges()) backDlg = true;
+        else goHome();
+    }
+
+    /** Cierra el escenario y deja el Builder como recién abierto (la lista se vuelve a cargar). */
+    function goHome(): void
+    {
+        backDlg = false;
+        homeAfterSave = false;
+        canvasRef?.pauseVideo();
+        canvasRef?.clearAllVisuals();
+        editor.resetMedia();
+        editor.scenes = [];
+        editor.activeSceneId = null;
+        editor.mediaLoaded = false;
+        editor.mediaName = '';
+        editor.setTool('none');
+        editor.closeSidebar();
+        editing = null;
+        savedSnapshot = null;
+        serverScenes = new Set();
+        serverFiles = new Set();
+        // Lo que se descartó no debe reaparecer si luego se abre un archivo con el mismo nombre
+        clearWorkspace();
+    }
+
+    async function saveFromBack(): Promise<void>
+    {
+        backDlg = false;
+        await handlePublish();
+        homeAfterSave = true;
+    }
+
+    /** Cerrar la pestaña, recargar o la flecha atrás del navegador con cambios sin guardar: el navegador pregunta. */
+    function handleBeforeUnload(e: BeforeUnloadEvent): void
+    {
+        if (!hasUnsavedChanges()) return;
+        e.preventDefault();
+        e.returnValue = '';
     }
 
     function countTargets(): number {
@@ -546,6 +616,7 @@
 
     async function handlePublish(): Promise<void> {
         if (editor.scenes.length === 0) return;
+        homeAfterSave = false;
 
         // Congelar el cuadro actual y tomarlo como portada
         canvasRef?.pauseVideo();
@@ -751,6 +822,11 @@
 
     function handleKeydown(e: KeyboardEvent): void
     {
+        if (backDlg)
+        {
+            if (e.key === 'Escape') backDlg = false;
+            return;
+        }
         if (editor.mediaType !== 'video' || !editor.mediaLoaded) return;
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
 
@@ -773,18 +849,33 @@
     }
 </script>
 
-<svelte:window onkeydown={handleKeydown} onpointerdown={handleGlobalPointerDown} />
+<svelte:window onkeydown={handleKeydown} onpointerdown={handleGlobalPointerDown} onbeforeunload={handleBeforeUnload} />
 
 <!-- Full-screen flex column layout -->
 <div class="flex flex-col h-screen">
 
-    <!-- Scene tabs bar (shown once at least one scene is loaded) -->
+    <!-- Barra de escenas, con el botón para volver al inicio a la izquierda.
+         z-[45]: por encima del fondo que cierra el panel lateral, así funciona con un solo clic -->
     {#if editor.scenes.length > 0}
-        <SceneBar
-            onAddScene={handleAddScene}
-            onSwitchScene={handleSwitchScene}
-            onRemoveScene={handleRemoveScene}
-        />
+        <div class="flex shrink-0">
+            <button
+                class="relative z-[45] flex items-center gap-1.5 px-3 h-9 shrink-0 text-xs font-semibold text-surface-200
+                       bg-surface-950 border-b border-r border-surface-700
+                       hover:bg-surface-800 hover:text-white transition-colors"
+                onclick={askGoHome}
+                title="Volver al inicio (lista de escenarios)"
+            >
+                <ArrowLeft size={14} />
+                <span>Volver</span>
+            </button>
+            <div class="flex-1 min-w-0">
+                <SceneBar
+                    onAddScene={handleAddScene}
+                    onSwitchScene={handleSwitchScene}
+                    onRemoveScene={handleRemoveScene}
+                />
+            </div>
+        </div>
     {/if}
 
     <!-- Canvas area: grows to fill remaining space -->
@@ -924,6 +1015,44 @@
     </div>
 {/if}
 
+<!-- Volver al inicio con cambios sin guardar -->
+{#if backDlg}
+    <div class="fixed inset-0 z-[400] flex items-center justify-center bg-black/70">
+        <div class="bg-surface-800 rounded-xl p-6 w-full max-w-lg mx-4 shadow-2xl border border-surface-600"
+             role="dialog" aria-modal="true" aria-labelledby="back-title">
+            <h3 id="back-title" class="text-lg font-semibold text-surface-100 mb-2">¿Volver al inicio?</h3>
+            <p class="text-sm text-surface-300">
+                {#if editing}
+                    Hay cambios sin guardar en <span class="font-semibold text-surface-100">«{editing.name}»</span>.
+                    Si vuelves ahora, se pierden.
+                {:else}
+                    Este escenario todavía no está publicado. Si vuelves ahora, se pierde lo que trazaste.
+                {/if}
+            </p>
+            <div class="flex flex-wrap gap-3 justify-end mt-5">
+                <button
+                    class="px-4 py-2 rounded-lg text-sm bg-surface-700 hover:bg-surface-600 text-surface-300 transition-colors"
+                    onclick={() => (backDlg = false)}
+                >
+                    Cancelar
+                </button>
+                <button
+                    class="px-4 py-2 rounded-lg text-sm bg-red-700 hover:bg-red-600 text-white transition-colors"
+                    onclick={goHome}
+                >
+                    Volver sin guardar
+                </button>
+                <button
+                    class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-500 text-white transition-colors"
+                    onclick={saveFromBack}
+                >
+                    {editing ? 'Guardar cambios' : 'Publicar'}
+                </button>
+            </div>
+        </div>
+    </div>
+{/if}
+
 <!-- Publicar: formulario, progreso y resultado -->
 {#if publishDlg}
     <div class="fixed inset-0 z-[400] flex items-center justify-center bg-black/70">
@@ -1027,12 +1156,14 @@
                         : 'ya aparece en la lista de escenarios de todos los polígonos.'}
                 </p>
                 <p class="text-xs text-surface-500 mt-3">
-                    Si sigues editando, «Publicar» guarda los cambios en este mismo escenario.
+                    {homeAfterSave
+                        ? 'Al presionar Listo vuelves al inicio.'
+                        : 'Si sigues editando, «Publicar» guarda los cambios en este mismo escenario.'}
                 </p>
                 <div class="flex justify-end mt-5">
                     <button
                         class="px-4 py-2 rounded-lg text-sm bg-green-600 hover:bg-green-500 text-white transition-colors"
-                        onclick={() => (publishDlg = false)}
+                        onclick={() => { publishDlg = false; if (homeAfterSave) goHome(); }}
                     >
                         Listo
                     </button>
